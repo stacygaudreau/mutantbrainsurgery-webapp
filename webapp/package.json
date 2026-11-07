@@ -1,0 +1,25 @@
+{
+  "name": "mutantbrain-surgery",
+  "version": "1.0.0",
+  "description": "SysEx patch builder for the Hexinverter Mutant Brain - static JavaScript port of the Mutant Brain Surgery ASP site",
+  "private": true,
+  "license": "CC-BY-NC-SA-4.0",
+  "main": "public/lib/mutantbrain-sysex.js",
+  "types": "public/lib/mutantbrain-sysex.d.ts",
+  "files": [
+    "public/lib/mutantbrain-sysex.js",
+    "public/lib/mutantbrain-sysex.d.ts"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "test": "node --test test/",
+    "test:quick": "node --test test/patches.test.js test/codec.test.js test/form.test.js test/generated.test.js",
+    "fixtures": "node tools/generate-fixtures.js",
+    "serve": "node tools/serve.js"
+  },
+  "devDependencies": {
+    "playwright-core": "^1.64.1"
+  }
+}

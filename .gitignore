@@ -1,0 +1,4 @@
+# browser partial downloads
+*.crdownload
+node_modules/
+.claude/

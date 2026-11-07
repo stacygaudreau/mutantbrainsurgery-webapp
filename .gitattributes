@@ -1,0 +1,7 @@
+*.syx binary
+*.zip binary
+*.gif binary
+# keep the original ASP sources byte-exact as on the server (no CRLF conversion)
+*.asp -text
+*.inc -text
+*.config -text

@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mutant Brain Surgery</title>
+<meta name="description" content="SysEx Patch Builder for the Hexinverter Mutant Brain Eurorack Module">
+<meta name="theme-color" content="#ffffff">
+<link rel="icon" href="data:,">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500&family=Share+Tech+Mono&display=swap">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="site-header">
+  <div class="wrap">
+    <h1>MUTANT BRAIN SURGERY</h1>
+    <h2>SysEx Patch Builder for the Mutant Brain Eurorack Module</h2>
+    <p id="load-error" class="error" role="alert" hidden>ERROR IN SYSEX FILE - NOT LOADED!! <span id="load-error-detail"></span></p>
+  </div>
+</header>
+
+<main class="wrap">
+  <section class="intro">
+    <div class="loader">
+      <h3>Load a patch</h3>
+      <p>You can load an existing Mutant Brain SysEx into this form, or create a new one from scratch!</p>
+      <input type="file" id="file" class="visually-hidden" accept=".syx,application/octet-stream">
+      <label for="file" class="btn btn-dark">Load SysEx</label>
+      <button type="button" id="reset" class="btn btn-ghost">Start From Scratch</button>
+      <p id="load-status" class="status" role="status" aria-live="polite"></p>
+    </div>
+    <!-- any orientation works: the image is scaled to fit its column (max 260px tall) -->
+    <figure class="hero"><img class="logo" src="img/mutantbrain.gif" alt="Mutant Brain module"></figure>
+  </section>
+  <noscript><p class="error">This page needs JavaScript enabled.</p></noscript>
+
+  <form id="sysex" action="#" autocomplete="off">
+    <div id="sections"></div>
+    <div class="actions">
+      <button type="submit" class="btn btn-accent go">Generate SysEx</button>
+    </div>
+  </form>
+</main>
+
+
+<script src="lib/mutantbrain-sysex.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
