@@ -24,7 +24,11 @@ const { execFileSync, execFile } = require('child_process');
 const { convertPage } = require('./asp2vbs');
 const { SimPage } = require('./browser-sim');
 
-const ASP_ROOT = process.env.MB_ASP_ROOT || path.resolve(__dirname, '../../..');
+// The original site's sources: MB_ASP_ROOT, else <repo>/old_asp_app, else the repo root.
+const REPO_ROOT = path.resolve(__dirname, '../../..');
+const ASP_ROOT = process.env.MB_ASP_ROOT ||
+  [path.join(REPO_ROOT, 'old_asp_app'), REPO_ROOT].find((dir) => fs.existsSync(path.join(dir, 'sysex.inc'))) ||
+  REPO_ROOT;
 const HARNESS = path.join(__dirname, 'harness.vbs');
 const WORKERS = Math.max(1, Math.min(8, Number(process.env.ORACLE_WORKERS) || os.cpus().length || 1));
 
