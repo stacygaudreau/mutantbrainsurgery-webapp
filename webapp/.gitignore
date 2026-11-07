@@ -1,3 +1,7 @@
+# build output (npm run build)
+dist/
+build/
+
 # Firebase CLI local state and logs
 .firebase/
 firebase-debug*.log

@@ -1,0 +1,9 @@
+{
+  // Compile-time tests of the public API's types (test/types/*.ts).
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "lib": ["ES2017"],
+    "noUnusedLocals": false
+  },
+  "include": ["src/lib", "test/types"]
+}

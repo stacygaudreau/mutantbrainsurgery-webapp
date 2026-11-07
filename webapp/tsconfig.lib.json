@@ -1,0 +1,10 @@
+{
+  // The reusable library on its own: no DOM types, so it cannot depend on a
+  // browser and works unchanged in Node, Electron, Tauri, workers, etc.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "lib": ["ES2017"],
+    "rootDir": "src/lib"
+  },
+  "include": ["src/lib"]
+}

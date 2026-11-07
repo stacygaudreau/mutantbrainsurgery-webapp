@@ -1,7 +1,8 @@
 'use strict';
 const fs = require('fs');
 const path = require('path');
-const MB = require('../public/lib/mutantbrain-sysex.js');
+// The library as shipped: the CommonJS build of src/lib (npm test builds it first).
+const MB = require('../build/lib/index.cjs');
 
 const REPO_ROOT = path.resolve(__dirname, '../..');
 const PATCHES_DIR = process.env.MB_PATCHES_DIR || path.join(REPO_ROOT, 'patches');
@@ -80,6 +81,27 @@ function randomSysex(r, { maxParams = 120 } = {}) {
   return Uint8Array.from(bytes);
 }
 
+/**
+ * Form option string -> Editor typed value, written independently of the
+ * library ("inf" -> "gate", keywords stay, everything else is a number).
+ */
+function typedValue(fieldName, optionValue) {
+  const kind = MB.Form.field(fieldName).column.kind;
+  if (kind === 'channel' && (optionValue === 'default' || optionValue === 'omni')) return optionValue;
+  if (kind === 'duration' && optionValue === 'inf') return 'gate';
+  if (kind === 'duration' && (optionValue === 'retrig' || optionValue === 'default')) return optionValue;
+  return Number(optionValue);
+}
+
+/** Build an Editor state that shows the given form values (in page order). */
+function editorStateFor(values, start = MB.Editor.create()) {
+  let state = start;
+  for (const f of MB.Form.FIELDS) {
+    if (f.name in values) state = MB.Editor.set(state, MB.Editor.refOf(f.name), typedValue(f.name, values[f.name]));
+  }
+  return state;
+}
+
 /** "f0007f15 0102000a ..." for readable assertion diffs. */
 function hexGroups(bytes) {
   const h = Buffer.from(bytes).toString('hex');
@@ -88,4 +110,5 @@ function hexGroups(bytes) {
 
 module.exports = {
   MB, REPO_ROOT, PATCHES_DIR, GENERATED_DIR, referencePatches, rng, randomUserValues, randomSysex, hexGroups,
+  typedValue, editorStateFor,
 };

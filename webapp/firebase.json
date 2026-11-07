@@ -1,12 +1,12 @@
 {
   "hosting": {
     "site": "mutantbrainsurgery",
-    "public": "public",
+    "public": "dist",
+    "predeploy": ["npm run build"],
     "ignore": [
       "firebase.json",
       "**/.*",
-      "**/node_modules/**",
-      "**/*.d.ts"
+      "**/node_modules/**"
     ],
     "cleanUrls": true,
     "trailingSlash": false,

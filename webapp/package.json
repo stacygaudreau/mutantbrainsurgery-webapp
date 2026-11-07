@@ -1,25 +1,39 @@
 {
   "name": "mutantbrain-surgery",
-  "version": "1.0.0",
-  "description": "SysEx patch builder for the Hexinverter Mutant Brain - static JavaScript port of the Mutant Brain Surgery ASP site",
+  "version": "2.0.0",
+  "description": "SysEx patch builder for the Hexinverter Mutant Brain, with a reusable TypeScript SysEx codec",
   "private": true,
   "license": "CC-BY-NC-SA-4.0",
-  "main": "public/lib/mutantbrain-sysex.js",
-  "types": "public/lib/mutantbrain-sysex.d.ts",
+  "main": "build/lib/index.cjs",
+  "module": "build/lib/index.mjs",
+  "types": "build/lib/types/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./build/lib/types/index.d.ts",
+      "import": "./build/lib/index.mjs",
+      "require": "./build/lib/index.cjs"
+    }
+  },
   "files": [
-    "public/lib/mutantbrain-sysex.js",
-    "public/lib/mutantbrain-sysex.d.ts"
+    "build/lib",
+    "src/lib"
   ],
   "engines": {
     "node": ">=18"
   },
   "scripts": {
+    "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.lib.json && tsc -p tsconfig.test-types.json",
+    "build": "npm run typecheck && node tools/build.mjs",
+    "pretest": "npm run build",
     "test": "node --test test/",
+    "pretest:quick": "npm run build",
     "test:quick": "node --test test/patches.test.js test/codec.test.js test/form.test.js test/generated.test.js",
-    "fixtures": "node tools/generate-fixtures.js",
-    "serve": "node tools/serve.js"
+    "fixtures": "npm run build && node tools/generate-fixtures.js",
+    "serve": "npm run build && node tools/serve.js"
   },
   "devDependencies": {
-    "playwright-core": "^1.64.1"
+    "esbuild": "^0.24.0",
+    "playwright-core": "^1.64.1",
+    "typescript": "^5.6.3"
   }
 }

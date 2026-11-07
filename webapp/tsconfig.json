@@ -1,0 +1,23 @@
+{
+  // Type-checks everything (library + page). esbuild does the actual compiling.
+  "compilerOptions": {
+    "target": "ES2017",
+    // Only ES2017 built-ins: using a newer API (e.g. Object.fromEntries) is a type
+    // error, which keeps the shipped code runnable in older browsers.
+    "lib": ["ES2017", "DOM"],
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "types": [],
+    "strict": true,
+    "noImplicitOverride": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "isolatedModules": true,
+    "verbatimModuleSyntax": true,
+    "forceConsistentCasingInFileNames": true,
+    "skipLibCheck": true,
+    "noEmit": true
+  },
+  "include": ["src"]
+}

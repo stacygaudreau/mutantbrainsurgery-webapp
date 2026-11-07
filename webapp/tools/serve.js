@@ -1,16 +1,16 @@
 #!/usr/bin/env node
 'use strict';
 /**
- * Minimal static server for local preview of public/ (no dependencies).
- *   npm run serve            -> http://127.0.0.1:8765/
- *   node tools/serve.js 9000 -> http://127.0.0.1:9000/
+ * Minimal static server for local preview of the built site in dist/.
+ *   npm run serve            -> builds, then http://127.0.0.1:8765/
+ *   node tools/serve.js 9000 -> http://127.0.0.1:9000/ (after npm run build)
  * Also used by test/browser.test.js.
  */
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
 
-const PUBLIC = path.resolve(__dirname, '../public');
+const PUBLIC = path.resolve(__dirname, '../dist');
 const TYPES = {
   '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css',
   '.gif': 'image/gif', '.png': 'image/png', '.json': 'application/json', '.ts': 'text/plain; charset=utf-8',

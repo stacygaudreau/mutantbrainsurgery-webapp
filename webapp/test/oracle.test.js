@@ -14,9 +14,14 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const oracle = require('../tools/asp-oracle/oracle');
 const { SimPage } = require('../tools/asp-oracle/browser-sim');
-const { MB, referencePatches, rng, randomUserValues, randomSysex, hexGroups } = require('./helpers');
+const { MB, referencePatches, rng, randomUserValues, randomSysex, hexGroups, typedValue, editorStateFor } = require('./helpers');
 
-const { MutantBrainPatch, Form } = MB;
+const { MutantBrainPatch, Form, Editor } = MB;
+
+/** The Editor's view of a state as { name: enabled } / { name: typed value }. */
+const editorEnabled = (state) => Object.fromEntries(Editor.view(state).fields.map((f) => [f.id, f.enabled]));
+const editorValues = (state) => Object.fromEntries(Editor.view(state).fields.map((f) => [f.id, f.value]));
+const typedPageValues = (page) => Object.fromEntries(Object.entries(page.values()).map(([n, v]) => [n, typedValue(n, v)]));
 const available = oracle.isAvailable();
 const SCALE = Math.max(0.1, Number(process.env.ORACLE_FUZZ) || 1);
 const N_FORMS = Math.round(2000 * SCALE);
@@ -104,6 +109,10 @@ test(`fuzz: ${N_FORMS} random user forms => identical enable state, submission a
     assert.deepEqual(diffKeys(res.page.enabled(), Form.enabledFields(inputs[i])), [], ctx);
     assert.deepEqual(res.submission, Form.submittedValues(inputs[i]), ctx);
     assert.equal(hexGroups(MutantBrainPatch.fromFormValues(inputs[i]).toSysex()), hexGroups(res.bytes), ctx);
+    // the typed Editor API, driven with the same choices, matches the original too
+    const state = editorStateFor(inputs[i]);
+    assert.deepEqual(diffKeys(res.page.enabled(), editorEnabled(state)), [], `${ctx} (editor enabled)`);
+    assert.equal(hexGroups(Editor.toSysex(state)), hexGroups(res.bytes), `${ctx} (editor bytes)`);
   });
 });
 
@@ -119,6 +128,11 @@ test(`fuzz: ${N_SYSEX} random .syx uploads => identical form, enable state and r
     assert.deepEqual(diffKeys(res.page.values(), shown), [], ctx);
     assert.deepEqual(diffKeys(res.page.enabled(), Form.enabledFields(shown)), [], ctx);
     assert.equal(hexGroups(patch.normalize().toSysex()), hexGroups(res.bytes), ctx);
+    // the Editor API: same values and enabled state as the original page, same saved bytes
+    const state = Editor.fromSysex(files[i]);
+    assert.deepEqual(diffKeys(typedPageValues(res.page), editorValues(state)), [], `${ctx} (editor values)`);
+    assert.deepEqual(diffKeys(res.page.enabled(), editorEnabled(state)), [], `${ctx} (editor enabled)`);
+    assert.equal(hexGroups(Editor.toSysex(state)), hexGroups(res.bytes), `${ctx} (editor bytes)`);
     if (Object.entries(Form.submittedValues(shown)).length !== Object.values(Form.enabledFields(shown)).filter(Boolean).length) quirkHits++;
   });
   assert.ok(quirkHits > 0, 'fuzz should exercise the "selected disabled option" quirk');

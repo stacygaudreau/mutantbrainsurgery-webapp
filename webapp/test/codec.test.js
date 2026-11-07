@@ -19,23 +19,10 @@ test('module exposes the codec API and constants', () => {
   assert.equal(MB.NUM_INPUTS, 4);
   assert.equal(MB.NUM_CVS, 4);
   assert.equal(MB.NUM_GATES, 12);
-  assert.ok(Object.isFrozen(MB) && Object.isFrozen(MB.SOURCE));
+  for (const c of [MB.SOURCE, MB.PARAM, MB.BLOCK, MB.CHAN, MB.DURATION, MB.MANUFACTURER_ID, MB.Form]) {
+    assert.ok(Object.isFrozen(c), 'constants cannot be modified');
+  }
   assert.equal(MB.DEFAULT_FILENAME, 'mutantbrain.syx');
-});
-
-test('works as a browser global (UMD) when no module system exists', () => {
-  const vm = require('vm');
-  const fs = require('fs');
-  const ctx = vm.createContext({});
-  vm.runInContext(fs.readFileSync(require.resolve('../public/lib/mutantbrain-sysex.js'), 'utf8'), ctx);
-  const G = ctx.MutantBrainSysex;
-  assert.ok(G && typeof G.MutantBrainPatch === 'function');
-  assert.equal(G.MutantBrainPatch.fromSysex(new G.MutantBrainPatch().toSysex()).toSysex().length, 4 + 58 * 4 + 1);
-});
-
-test('works with ESM import (Node CommonJS interop)', async () => {
-  const mod = await import('../public/lib/mutantbrain-sysex.js');
-  assert.equal(typeof mod.default.MutantBrainPatch, 'function');
 });
 
 // ---------------------------------------------------------------- defaults
@@ -58,8 +45,14 @@ test('constructor defaults mirror sysex.inc Class_Initialize', () => {
   assert.equal(new MutantBrainPatch().inputs[0].source, 0);
 });
 
-test('can be called without new', () => {
-  assert.ok(MutantBrainPatch() instanceof MutantBrainPatch); // eslint-disable-line new-cap
+test('constructor deep-copies the data it is given', () => {
+  const source = new MutantBrainPatch();
+  source.gates[0].minNote = 42;
+  const copy = new MutantBrainPatch(source);
+  assert.equal(copy.gates[0].minNote, 42);
+  copy.gates[0].minNote = 7;
+  assert.equal(source.gates[0].minNote, 42, 'changing the copy leaves the original alone');
+  assert.ok(copy instanceof MutantBrainPatch);
 });
 
 // ---------------------------------------------------------------- encoding
