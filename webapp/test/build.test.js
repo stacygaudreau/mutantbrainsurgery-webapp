@@ -60,7 +60,10 @@ test('website bundle (dist/app.js) only uses ES2017 syntax', () => {
 test('website bundle is self-contained: one script, plus static assets', () => {
   const html = read('dist/index.html');
   assert.deepEqual([...html.matchAll(/<script src="([^"]+)"/g)].map((m) => m[1]), ['app.js']);
-  for (const f of ['index.html', 'style.css', 'app.js', 'img/mutantbrain.gif']) {
+  for (const f of [
+    'index.html', 'style.css', 'app.js', 'img/mutantbrain-black.png', 'img/mutantbrain-black.webp',
+    'img/hexinverter-logo.svg', 'img/starfield.svg', 'fonts/noyh_black-webfont.woff2',
+  ]) {
     assert.ok(fs.existsSync(path.join(root, 'dist', f)), `dist/${f}`);
   }
   assert.match(read('dist/app.js'), /^\/\*! Mutant Brain Surgery \| CC BY-NC-SA 4\.0/);

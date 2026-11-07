@@ -47,12 +47,24 @@ function buildSelect(field: FormField): HTMLSelectElement {
   return select;
 }
 
+/** A section is a framed pane: title set into the border, table inside. */
 function buildSection(section: FormSection): HTMLElement {
-  const heading = el('h3', { textContent: section.title });
-  if (section.key === 'globals') {
-    heading.appendChild(el('span', { className: 'hint', textContent: 'Tip: hover a column heading for a description' }));
-  }
+  const heading = el('h3', { className: 'info-panel__header', textContent: section.title });
+  // A section with a single item (the globals) lists its settings as rows;
+  // the others have one row per item and one column per setting.
+  const table = section.count === 1 ? buildSettingsList(section) : buildItemTable(section);
 
+  const block = el('section', { className: 'block info-panel', 'aria-label': section.title }, [heading]);
+  if (section.key === 'globals') {
+    block.appendChild(el('p', { className: 'hint', textContent: 'Tip: hover a setting name for a description' }));
+  }
+  block.appendChild(el('div', { className: 'scroll' }, [table]));
+  if (section.firmwareNote) block.appendChild(firmwareNote());
+  return block;
+}
+
+/** One row per item (e.g. Gate.1 - Gate.12), one column per setting. */
+function buildItemTable(section: FormSection): HTMLTableElement {
   const headerRow = el('tr', {}, [el('td', { className: 'row-label' })]);
   for (const column of section.columns) {
     if (column.gapBefore) headerRow.appendChild(el('td', { className: 'gap' }));
@@ -69,13 +81,21 @@ function buildSection(section: FormSection): HTMLElement {
     }
     body.appendChild(tr);
   }
+  return el('table', { className: 'grid' }, [el('thead', {}, [headerRow]), body]);
+}
 
-  const block = el('section', { className: 'block', 'aria-label': section.title }, [
-    heading,
-    el('div', { className: 'scroll' }, [el('table', { className: 'grid' }, [el('thead', {}, [headerRow]), body])]),
-  ]);
-  if (section.firmwareNote) block.appendChild(firmwareNote());
-  return block;
+/** A single item's settings as rows: setting name | value. */
+function buildSettingsList(section: FormSection): HTMLTableElement {
+  const body = el('tbody');
+  for (const column of section.columns) {
+    const field = Form.field(Form.fieldName(section, 0, column));
+    if (!field) continue;
+    body.appendChild(el('tr', {}, [
+      el('td', { className: 'row-label', title: column.title, textContent: column.header }),
+      el('td', {}, [buildSelect(field)]),
+    ]));
+  }
+  return el('table', { className: 'grid grid--settings' }, [body]);
 }
 
 function firmwareNote(): HTMLElement {
@@ -183,8 +203,13 @@ function downloadSysex(event: Event): void {
 // Start
 // ---------------------------------------------------------------------------
 
+// A section goes into its own slot if the page has one (e.g. the globals sit
+// beside "Load a patch"), otherwise into the main list of sections.
 const sectionsRoot = byId('sections');
-for (const section of Form.SECTIONS) sectionsRoot.appendChild(buildSection(section));
+for (const section of Form.SECTIONS) {
+  const slot = document.getElementById(`slot-${section.key}`) || sectionsRoot;
+  slot.appendChild(buildSection(section));
+}
 showPatch(new MutantBrainPatch());
 
 byId('file').addEventListener('change', loadChosenFile);

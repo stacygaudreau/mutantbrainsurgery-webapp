@@ -106,7 +106,8 @@ test('renders every field with exactly the library schema', async (t) => {
   for (const s of selects) {
     assert.deepEqual(s.options, Form.field(s.name).options.map((o) => [o.value, o.label, !!o.disabled]), s.name);
   }
-  const headers = await page.evaluate(() => [...document.querySelectorAll('thead td[title]')].map((td) => td.textContent));
+  // setting names with descriptions: column headings, or row names in the single-item (globals) pane
+  const headers = await page.evaluate(() => [...document.querySelectorAll('table.grid td[title]')].map((td) => td.textContent));
   assert.equal(headers.length, Form.SECTIONS.reduce((n, s) => n + s.columns.length, 0));
   assert.equal(await page.evaluate(() => document.querySelector('img.logo').naturalWidth > 0), true, 'logo loads');
   const links = await page.evaluate(() => [...document.querySelectorAll('.note a')].map((a) => a.href));
@@ -221,7 +222,7 @@ test('bad files show the error and leave the form alone; a good file clears it',
   await waitLoaded(page, ref.name);
   assert.equal(await page.isHidden('#load-error'), true);
   await page.click('#reset');
-  assert.deepEqual(await domValues(page), Form.defaultFormValues(), 'Start From Scratch resets the form');
+  assert.deepEqual(await domValues(page), Form.defaultFormValues(), 'Clear All resets the form');
 });
 
 test('choosing a file loads it immediately; choosing the same file again reloads it', async (t) => {

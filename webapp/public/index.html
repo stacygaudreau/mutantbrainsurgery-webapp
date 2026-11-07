@@ -5,45 +5,62 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Mutant Brain Surgery</title>
 <meta name="description" content="SysEx Patch Builder for the Hexinverter Mutant Brain Eurorack Module">
-<meta name="theme-color" content="#ffffff">
+<meta name="theme-color" content="#000000">
 <link rel="icon" href="data:,">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500&family=Share+Tech+Mono&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&family=Roboto+Mono:wght@400;500&display=swap">
+<link rel="preload" href="fonts/noyh_black-webfont.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
-<header class="site-header">
-  <div class="wrap">
-    <h1>MUTANT BRAIN SURGERY</h1>
-    <h2>SysEx Patch Builder for the Mutant Brain Eurorack Module</h2>
-    <p id="load-error" class="error" role="alert" hidden>ERROR IN SYSEX FILE - NOT LOADED!! <span id="load-error-detail"></span></p>
-  </div>
+<header class="nav-bar">
+  <a class="nav-bar__logo" href="https://www.hexinverter.net/"><img src="img/hexinverter-logo.svg" alt="Hexinverter Électronique"></a>
 </header>
 
-<main class="wrap">
-  <section class="intro">
-    <div class="loader">
-      <h3>Load a patch</h3>
-      <p>You can load an existing Mutant Brain SysEx into this form, or create a new one from scratch!</p>
-      <input type="file" id="file" class="visually-hidden" accept=".syx,application/octet-stream">
-      <label for="file" class="btn btn-dark">Load SysEx</label>
-      <button type="button" id="reset" class="btn btn-ghost">Start From Scratch</button>
-      <p id="load-status" class="status" role="status" aria-live="polite"></p>
-    </div>
-    <!-- any orientation works: the image is scaled to fit its column (max 260px tall) -->
-    <figure class="hero"><img class="logo" src="img/mutantbrain.gif" alt="Mutant Brain module"></figure>
-  </section>
-  <noscript><p class="error">This page needs JavaScript enabled.</p></noscript>
+<!-- Hero: space background that fades into the page colour where the editor begins -->
+<section class="hero">
+  <div class="page__inner hero__inner">
+    <header class="page-heading">
+      <h1 class="page-heading__title">Mutant Brain Surgery</h1>
+      <h2 class="page-heading__subtitle">SysEx Patch Builder for the Mutant Brain Eurorack Module</h2>
+    </header>
+    <!-- any orientation works: the image is scaled to fit -->
+    <figure class="module-shot">
+      <picture>
+        <source srcset="img/mutantbrain-black.webp" type="image/webp">
+        <img class="logo" src="img/mutantbrain-black.png" alt="Mutant Brain module, black front panel">
+      </picture>
+    </figure>
+    <noscript><p class="status status--error">This page needs JavaScript enabled.</p></noscript>
+  </div>
+</section>
 
-  <form id="sysex" action="#" autocomplete="off">
-    <div id="sections"></div>
-    <div class="actions">
-      <button type="submit" class="btn btn-accent go">Generate SysEx</button>
-    </div>
-  </form>
+<main class="page">
+  <div class="page__inner">
+    <form id="sysex" action="#" autocomplete="off">
+      <!-- first row of panes: loading/clearing beside the global settings -->
+      <div class="pane-row">
+        <section class="block info-panel loader" aria-label="Load a patch">
+          <h3 class="info-panel__header">Load a patch</h3>
+          <div class="loader__body">
+            <p>You can load an existing Mutant Brain SysEx into this form, or create a new one from scratch!</p>
+            <input type="file" id="file" class="visually-hidden" accept=".syx,application/octet-stream">
+            <label for="file" class="btn btn--teal">Load SysEx</label>
+            <button type="button" id="reset" class="btn btn--black">Clear All</button>
+            <p id="load-status" class="status status--ok" role="status" aria-live="polite"></p>
+            <p id="load-error" class="status status--error" role="alert" hidden>ERROR IN SYSEX FILE - NOT LOADED!! <span id="load-error-detail"></span></p>
+          </div>
+        </section>
+        <div id="slot-globals" class="pane-row__slot"></div>
+      </div>
+      <div id="sections"></div>
+      <div class="actions">
+        <button type="submit" class="btn btn--accent go">Generate SysEx</button>
+      </div>
+    </form>
+  </div>
 </main>
-
 
 <!-- app.js is built from src/ by `npm run build` -->
 <script src="app.js"></script>

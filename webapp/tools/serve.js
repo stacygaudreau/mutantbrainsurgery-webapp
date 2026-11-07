@@ -14,6 +14,7 @@ const PUBLIC = path.resolve(__dirname, '../dist');
 const TYPES = {
   '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css',
   '.gif': 'image/gif', '.png': 'image/png', '.json': 'application/json', '.ts': 'text/plain; charset=utf-8',
+  '.svg': 'image/svg+xml', '.woff2': 'font/woff2', '.woff': 'font/woff',
 };
 
 function createServer() {
