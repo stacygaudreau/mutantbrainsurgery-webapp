@@ -131,6 +131,41 @@ reserved for NRPN. States are always canonical: they hold exactly the values the
 controls show. Values set on a control that doesn't currently apply are kept, and
 used once it applies again.
 
+## PatchDocument (the patch an app has open)
+
+A `PatchDocument` is what an editor holds in memory: `{ name, patch, modified }`,
+where `patch` is an Editor state and `modified` says whether the settings changed
+since the patch was created, opened or saved. Documents are immutable (frozen);
+every function returns a new document, or the same one when nothing changed, so
+it can be React state or the subject of a reducer.
+
+```ts
+import { PatchDocument } from 'mutantbrain-sysex';
+
+let doc = PatchDocument.open('Roland TR-08.syx', bytes);   // name "Roland TR-08"
+doc = PatchDocument.set(doc, { section: 'gates', index: 0, control: 'minNote' }, 38);
+doc.modified;                                               // true
+doc = PatchDocument.rename(doc, 'My TR-08');
+const { fileName, bytes: out, document } = PatchDocument.save(doc);
+// fileName "My TR-08.syx", out = the SysEx, document = doc with modified false
+```
+
+| Function | |
+| --- | --- |
+| `PatchDocument.create(name = 'untitled')` | A new patch with fresh settings |
+| `PatchDocument.open(fileName, bytes)` | Settings from a .syx, name from its file name; throws `MutantBrainError` for a bad file |
+| `PatchDocument.set(doc, ref, value)` / `setValue` | Change one setting (typed / generic), marks the document modified |
+| `PatchDocument.rename(doc, name)` | New name; the settings and `modified` are unchanged |
+| `PatchDocument.clear(doc)` | Fresh settings, same name |
+| `PatchDocument.fileName(doc)` | The name made safe as a file name, plus `.syx` |
+| `PatchDocument.toSysex(doc)` | Bytes of the current settings |
+| `PatchDocument.save(doc)` | `{ fileName, bytes, document }`; `document` is marked saved |
+| `PatchDocument.nameFromFileName(fileName)` | Base name without folder or `.syx` |
+
+The name is kept as typed; `fileName` replaces characters not allowed in file
+names with `-` and falls back to `untitled`. As on the original site, settings that
+don't apply are saved as 0, so they come back as 0 when the file is opened again.
+
 ## Form helpers (the web page's string-based form)
 
 `Form.SECTIONS` and `Form.FIELDS` describe every dropdown: field names (`'gt1.src'`,
@@ -163,7 +198,8 @@ Everything throws `MutantBrainError` (a subclass of `Error`) with a `code`:
 
 `SOURCE`, `CHAN`, `DURATION`, `PARAM`, `BLOCK`, `MANUFACTURER_ID`,
 `LEGACY_MANUFACTURER_ID` (`00 7F 12`, accepted when loading), `CV_EVENT_VELOCITY`,
-`NUM_INPUTS`, `NUM_CVS`, `NUM_GATES`, `DEFAULT_FILENAME`.
+`NUM_INPUTS`, `NUM_CVS`, `NUM_GATES`, `DEFAULT_FILENAME` (the original site's
+download name), `DEFAULT_PATCH_NAME`, `PATCH_FILE_EXTENSION`.
 
 ## Build, test, deploy
 

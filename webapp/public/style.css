@@ -131,6 +131,7 @@ h1, h2, h3 { font-weight: normal; margin: 0; }
 
 /* ---------------------------------------------------------------- hero: module image */
 .module-shot { margin: 0; display: flex; justify-content: center; align-items: center; }
+@media (min-width: 900px) { .module-shot { margin: 7rem 0 4rem; } }
 .logo {
   display: block;
   width: auto; height: auto;
@@ -139,14 +140,14 @@ h1, h2, h3 { font-weight: normal; margin: 0; }
   box-shadow: 0 3px 8px rgba(0, 0, 0, 0.6), 0 0 60px rgba(63, 113, 126, 0.3); /* faint teal glow in the "space" */
 }
 
-.loader__body { display: grid; gap: 1.4rem; }
+.loader__body { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1.4rem; }
 
 /* info panel: border with the title set into it */
 .info-panel {
   position: relative;
   margin: 2rem 0;
   padding: 4.4rem 3.2rem 3.2rem;
-  border: 2px solid var(--light);
+  border: 2px solid var(--mid);
   text-align: center;
 }
 .info-panel__header {
@@ -163,6 +164,53 @@ h1, h2, h3 { font-weight: normal; margin: 0; }
   color: var(--white);
 }
 .loader p { margin: 0 0 0.6rem; font-size: 1.7rem; line-height: 1.5; }
+
+/* patch name field */
+.field { display: grid; gap: 0.6rem; margin-bottom: 1.2rem; text-align: left; }
+.field__label { font: 1.4rem/1.2 var(--mono); color: var(--light); text-transform: uppercase; letter-spacing: 0.05rem; }
+/* The name reads as plain text; focusing it (click, Tab or the pencil)
+   turns the box into an editor with a fill and a focus ring. */
+.field__input {
+  display: flex; align-items: stretch;
+  border: 2px solid transparent;
+  background: transparent;
+}
+.field__input:hover { background: rgba(252, 252, 252, 0.04); }
+.field__input:focus-within { background: var(--cell, #33363a); outline: 2px solid var(--link); outline-offset: 2px; }
+/* a patch file is open: teal name box and pane border */
+.loader--loaded, .loader--loaded .field__input { border-color: var(--link); }
+.text-input {
+  flex: 1; min-width: 0; width: 0;
+  padding: 1.1rem 1.2rem;
+  border: none; border-radius: 0;
+  background: transparent; color: var(--white);
+  font: 700 1.8rem/1.2 Roboto, sans-serif;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+.text-input:focus { outline: none; cursor: text; font-weight: 400; }
+.icon-btn {
+  display: flex; align-items: center; justify-content: center;
+  width: 4.4rem; padding: 0;
+  border: none; border-radius: 0;
+  background: transparent; color: var(--light);
+  cursor: pointer;
+  transition: color 0.15s;
+}
+.icon-btn:hover, .field__input:focus-within .icon-btn { color: var(--link); }
+.icon-btn:focus-visible { outline: 2px solid var(--link); outline-offset: -2px; }
+.icon-btn .icon { width: 2rem; height: 2rem; }
+
+/* icons: outline strokes in the text colour */
+.icon {
+  flex: none;
+  width: 1em; height: 1em;
+  fill: none; stroke: currentColor; stroke-width: 2;
+  stroke-linecap: round; stroke-linejoin: round;
+}
+.btn.btn--icon { display: flex; align-items: center; justify-content: center; gap: 1.3rem; }
+.btn.btn--icon .icon { width: 1.1em; height: 1.1em; }
+.btn-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 1.4rem; }
 
 /* ---------------------------------------------------------------- buttons */
 .btn {
@@ -229,7 +277,7 @@ h1, h2, h3 { font-weight: normal; margin: 0; }
 /* a single item's settings listed as rows: name | value */
 table.grid--settings td.row-label[title] { cursor: help; }
 
-.block .hint { margin: 0 0 1.6rem; font-size: 1.4rem; color: var(--mid); width: 0; min-width: 100%; }
+.block .hint { margin: 1.6rem 0 0; font-size: 1.4rem; color: var(--mid); width: 0; min-width: 100%; }
 /* the note wraps to the table's width instead of widening the pane */
 .block .note { margin: 2rem 0 0; width: 0; min-width: 100%; }
 .scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }

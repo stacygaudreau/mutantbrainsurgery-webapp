@@ -1,8 +1,15 @@
 /**
- * Mutant Brain Surgery page: builds the form from the library's schema and
- * wires up loading and saving. All patch logic lives in the library.
+ * Mutant Brain Surgery page. The patch being edited lives in memory as a
+ * PatchDocument; the page renders it and turns user actions into library
+ * calls (open, new, clear, rename, change a setting, save). All patch logic
+ * lives in the library.
  */
-import { DEFAULT_FILENAME, Form, MutantBrainPatch, type FormField, type FormSection, type FormValues } from '../lib';
+import { Editor, Form, PatchDocument, type EditorView, type FieldRef, type FieldView, type FormField, type FormSection } from '../lib';
+
+/** The patch being edited. Only `update` replaces it. */
+let doc: PatchDocument = PatchDocument.create();
+/** Editor.view(doc.patch), computed once per change of settings. */
+let view: EditorView = Editor.view(doc.patch);
 
 const selects = new Map<string, HTMLSelectElement>();
 
@@ -34,15 +41,22 @@ function byId<T extends HTMLElement = HTMLElement>(id: string): T {
 }
 
 // ---------------------------------------------------------------------------
-// Rendering the form
+// Building the form
 // ---------------------------------------------------------------------------
 
+function fieldView(name: string): FieldView {
+  return view.get(Editor.refOf(name));
+}
+
+/** A dropdown for one setting. Option i stands for the field's option i. */
 function buildSelect(field: FormField): HTMLSelectElement {
+  const { ref, options } = fieldView(field.name);
   const select = el('select', { name: field.name, id: field.name, 'aria-label': field.name });
-  for (const o of field.options) {
-    select.appendChild(el('option', { value: o.value, textContent: o.label, disabled: !!o.disabled }));
+  for (const o of options) {
+    const label = o.needsNewerFirmware ? `${o.label} †` : o.label;
+    select.appendChild(el('option', { value: String(o.value), textContent: label, disabled: o.disabled }));
   }
-  select.addEventListener('change', applyEnabledFields);
+  select.addEventListener('change', () => changeSetting(ref, select));
   selects.set(field.name, select);
   return select;
 }
@@ -55,10 +69,10 @@ function buildSection(section: FormSection): HTMLElement {
   const table = section.count === 1 ? buildSettingsList(section) : buildItemTable(section);
 
   const block = el('section', { className: 'block info-panel', 'aria-label': section.title }, [heading]);
-  if (section.key === 'globals') {
+  block.appendChild(el('div', { className: 'scroll' }, [table]));
+  if (section.key === 'inputs') {
     block.appendChild(el('p', { className: 'hint', textContent: 'Tip: hover a setting name for a description' }));
   }
-  block.appendChild(el('div', { className: 'scroll' }, [table]));
   if (section.firmwareNote) block.appendChild(firmwareNote());
   return block;
 }
@@ -100,131 +114,186 @@ function buildSettingsList(section: FormSection): HTMLTableElement {
 
 function firmwareNote(): HTMLElement {
   return el('p', { className: 'note' }, [
-    '† Some settings have specific firmware requirements. Make sure you have an ',
+    '† Some settings have specific firmware requirements. Make sure you have an ',
     el('a', { href: Form.FIRMWARE_URL, textContent: 'appropriate firmware version', target: '_blank', rel: 'noopener' }),
     ' to use settings marked with the † symbol',
   ]);
 }
 
 // ---------------------------------------------------------------------------
-// Form state
+// Showing the document
 // ---------------------------------------------------------------------------
 
-/** The value every dropdown currently shows. */
-function currentValues(): FormValues {
-  const values: FormValues = {};
-  selects.forEach((select, name) => (values[name] = select.value));
-  return values;
+/** Make the page show `doc`. */
+function render(): void {
+  selects.forEach((select, name) => {
+    const f = fieldView(name);
+    select.value = String(f.value);
+    select.disabled = !f.enabled;
+  });
+  const nameInput = byId<HTMLInputElement>('patch-name');
+  if (nameInput.value !== doc.name) nameInput.value = doc.name;  document.title = `${doc.modified ? '• ' : ''}${doc.name} - Mutant Brain Surgery`;
 }
 
-function applyEnabledFields(): void {
-  const enabled = Form.enabledFields(currentValues());
-  selects.forEach((select, name) => (select.disabled = !enabled[name]));
+/** Replace the document and re-render if it changed. */
+function update(next: PatchDocument): void {
+  if (next === doc) return;
+  if (next.patch !== doc.patch) view = Editor.view(next.patch);
+  doc = next;
+  render();
 }
-
-function showPatch(patch: MutantBrainPatch): void {
-  const values = patch.toFormValues();
-  selects.forEach((select, name) => (select.value = values[name]));
-  applyEnabledFields();
-}
-
-/** The SysEx the form currently describes (what the original site produced). */
-function buildSysex(): Uint8Array {
-  return MutantBrainPatch.fromFormValues(currentValues()).toSysex();
-}
-
-// ---------------------------------------------------------------------------
-// Loading and saving
-// ---------------------------------------------------------------------------
 
 function showError(message: string | null): void {
   byId('load-error').hidden = !message;
   byId('load-error-detail').textContent = message ? `(${message})` : '';
 }
 
-function showLoaded(fileName: string | null): void {
-  const status = byId('load-status');
-  status.textContent = '';
-  if (fileName === null) return;
-  // "Loaded <strong>name.syx</strong>" (textContent reads "Loaded name.syx")
-  status.append('Loaded ', el('strong', { textContent: fileName }));
+/**
+ * Whether the patch came from a file: "Patch loaded" with a teal pane and name
+ * box, or "Load patch" for a new one. Clear All keeps it, New Patch ends it.
+ */
+function showLoaded(loaded: boolean): void {
+  byId('patch-pane').classList.toggle('loader--loaded', loaded);
+  byId('patch-title').textContent = loaded ? 'Patch Loaded' : 'Load Patch';
+  byId('intro-empty').hidden = loaded;
+  byId('intro-loaded').hidden = !loaded;
 }
 
-/** Load SysEx bytes into the form. Returns true on success. */
-function loadBytes(bytes: Uint8Array, fileName = ''): boolean {
+const errorText = (error: unknown) => (error instanceof Error ? error.message : String(error));
+
+// ---------------------------------------------------------------------------
+// User actions
+// ---------------------------------------------------------------------------
+
+function changeSetting(ref: FieldRef, select: HTMLSelectElement): void {
+  const option = fieldView(select.name).options[select.selectedIndex];
+  if (option) update(PatchDocument.setValue(doc, ref, option.value));
+  render(); // also puts back a value the document did not take
+}
+
+/** Open SysEx bytes as the document. Returns true on success; a bad file leaves the document as it was. */
+function openBytes(bytes: Uint8Array, fileName = ''): boolean {
   try {
-    showPatch(MutantBrainPatch.fromSysex(bytes));
+    update(PatchDocument.open(fileName, bytes));
     showError(null);
-    showLoaded(fileName);
+    showLoaded(true);
     return true;
   } catch (error) {
-    showError(error instanceof Error ? error.message : String(error));
-    showLoaded(null);
+    showError(errorText(error));
     return false;
   }
 }
 
-/** Choosing a file loads it straight away. */
-function loadChosenFile(): void {
+/** Choosing a file opens it straight away. */
+function openChosenFile(): void {
   const input = byId<HTMLInputElement>('file');
   const file = input.files && input.files[0];
   if (!file) return; // picker cancelled
   const reader = new FileReader();
-  reader.onload = () => loadBytes(new Uint8Array(reader.result as ArrayBuffer), file.name);
+  reader.onload = () => openBytes(new Uint8Array(reader.result as ArrayBuffer), file.name);
   reader.onerror = () => showError('could not read the file');
   reader.readAsArrayBuffer(file);
-  // Clear the picker so choosing the same file again (e.g. to undo edits)
-  // fires 'change' again; the status line shows what was loaded.
+  // Clear the picker so choosing the same file again (e.g. to undo edits) fires 'change' again.
   input.value = '';
 }
 
-function startFromScratch(): void {
-  showPatch(new MutantBrainPatch());
+/** A new patch: fresh settings and a new name, selected ready to type over. */
+function newPatch(): void {
+  update(PatchDocument.create());
   showError(null);
-  showLoaded(null);
-  byId<HTMLInputElement>('file').value = '';
+  showLoaded(false);
+  editName();
 }
 
-function downloadSysex(event: Event): void {
+/** Fresh settings, same name. */
+function clearAll(): void {
+  update(PatchDocument.clear(doc));
+  showError(null);
+}
+
+// The name field reads as text until focused (clicking it, Tab, or the
+// pencil button). Typing renames the patch; Enter or leaving the field
+// finishes, Escape puts back the name it had before editing.
+let nameBeforeEditing = doc.name;
+
+function renamePatch(): void {
+  update(PatchDocument.rename(doc, byId<HTMLInputElement>('patch-name').value));
+}
+
+function editName(): void {
+  const nameInput = byId<HTMLInputElement>('patch-name');
+  nameInput.focus();
+  nameInput.select();
+}
+
+function nameKeys(event: KeyboardEvent): void {
+  const nameInput = event.currentTarget as HTMLInputElement;
+  if (event.key === 'Enter') {
+    event.preventDefault(); // don't submit the form (download)
+    nameInput.blur();
+  } else if (event.key === 'Escape') {
+    update(PatchDocument.rename(doc, nameBeforeEditing));
+    nameInput.blur();
+  }
+}
+
+/** "Generate SysEx": download the patch as <name>.syx. */
+function savePatch(event: Event): void {
   event.preventDefault();
   try {
-    const url = URL.createObjectURL(new Blob([buildSysex()], { type: 'application/octet-stream' }));
-    const link = el('a', { href: url, download: DEFAULT_FILENAME });
+    const saved = PatchDocument.save(doc);
+    const url = URL.createObjectURL(new Blob([saved.bytes], { type: 'application/octet-stream' }));
+    const link = el('a', { href: url, download: saved.fileName });
     document.body.appendChild(link);
     link.click();
     link.remove();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
+    update(saved.document);
+    showError(null);
   } catch (error) {
-    showError(error instanceof Error ? error.message : String(error));
+    showError(errorText(error));
   }
 }
 
 // ---------------------------------------------------------------------------
-// Start
+// Start up
 // ---------------------------------------------------------------------------
 
-// A section goes into its own slot if the page has one (e.g. the globals sit
-// beside "Load a patch"), otherwise into the main list of sections.
 const sectionsRoot = byId('sections');
 for (const section of Form.SECTIONS) {
   const slot = document.getElementById(`slot-${section.key}`) || sectionsRoot;
   slot.appendChild(buildSection(section));
 }
-showPatch(new MutantBrainPatch());
+render();
 
-byId('file').addEventListener('change', loadChosenFile);
-byId('reset').addEventListener('click', startFromScratch);
-byId('sysex').addEventListener('submit', downloadSysex);
+byId('file').addEventListener('change', openChosenFile);
+byId('open').addEventListener('keydown', (event) => {
+  // The "Open Patch" label acts as a button: Enter or Space opens the file picker.
+  if (event.key === 'Enter' || event.key === ' ') {
+    event.preventDefault();
+    byId('file').click();
+  }
+});
+byId('new').addEventListener('click', newPatch);
+byId('reset').addEventListener('click', clearAll);
+const nameField = byId<HTMLInputElement>('patch-name');
+nameField.addEventListener('input', renamePatch);
+nameField.addEventListener('focus', () => (nameBeforeEditing = doc.name));
+nameField.addEventListener('keydown', nameKeys);
+nameField.addEventListener('blur', () => nameField.setSelectionRange(0, 0)); // show the start of a long name
+const renameButton = byId('rename');
+renameButton.addEventListener('mousedown', (event) => event.preventDefault()); // keep focus (and edits) in the field
+renameButton.addEventListener('click', editName);
+byId('sysex').addEventListener('submit', savePatch);
 
-// Hook for automated browser tests and the devtools console.
+/** Hooks for tests and the console. */
 declare global {
   interface Window {
     MutantBrainApp: {
-      loadBytes: typeof loadBytes;
-      currentValues: typeof currentValues;
-      buildSysex: typeof buildSysex;
-      showPatch: typeof showPatch;
+      /** The document being edited. */
+      document(): PatchDocument;
+      openBytes(bytes: Uint8Array, fileName?: string): boolean;
     };
   }
 }
-window.MutantBrainApp = { loadBytes, currentValues, buildSysex, showPatch };
+window.MutantBrainApp = { document: () => doc, openBytes };

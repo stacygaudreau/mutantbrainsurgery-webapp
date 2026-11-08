@@ -13,6 +13,7 @@ import { submittedValues } from './form/submit';
 
 export { MutantBrainPatch } from './MutantBrainPatch';
 export { Editor } from './editor/editor';
+export { PatchDocument, DEFAULT_PATCH_NAME, PATCH_FILE_EXTENSION, type SavedPatch } from './document';
 export type {
   ChannelValue,
   Control,

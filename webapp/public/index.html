@@ -37,18 +37,45 @@
 </section>
 
 <main class="page">
+  <!-- icons (24px outline style, drawn with the text colour) -->
+  <svg xmlns="http://www.w3.org/2000/svg" style="display: none">
+    <symbol id="i-open" viewBox="0 0 24 24"><path d="M3 19V6a1 1 0 0 1 1-1h5l2 2h8a1 1 0 0 1 1 1v3"/><path d="M3 19l3-8h16l-3 8z"/></symbol>
+    <symbol id="i-new" viewBox="0 0 24 24"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M12 11v6M9 14h6"/></symbol>
+    <symbol id="i-clear" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
+    <symbol id="i-pencil" viewBox="0 0 24 24"><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L8 18l-4 1 1-4z"/><path d="M14.5 5.5l3 3"/></symbol>
+    <symbol id="i-save" viewBox="0 0 24 24"><path d="M5 3h11l5 5v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"/><path d="M7 3v5h8V3"/><path d="M7 21v-7h10v7"/></symbol>
+  </svg>
   <div class="page__inner">
     <form id="sysex" action="#" autocomplete="off">
       <!-- first row of panes: loading/clearing beside the global settings -->
       <div class="pane-row">
-        <section class="block info-panel loader" aria-label="Load a patch">
-          <h3 class="info-panel__header">Load a patch</h3>
+        <section id="patch-pane" class="block info-panel loader" aria-labelledby="patch-title">
+          <h3 id="patch-title" class="info-panel__header">Load Patch</h3>
           <div class="loader__body">
-            <p>You can load an existing Mutant Brain SysEx into this form, or create a new one from scratch!</p>
+            <p id="intro-empty">Open a Mutant Brain SysEx file to edit it, or start a new patch from scratch!</p>
+            <p id="intro-loaded" hidden><strong>Editing patch</strong>. Download it to save it, or create a new patch to start over.</p>
+            <div class="field">
+              <label for="patch-name" class="field__label">Patch name</label>
+              <!-- shows the name as text; clicking it (or the pencil) edits it -->
+              <div class="field__input">
+                <input type="text" id="patch-name" class="text-input" autocomplete="off" spellcheck="false" maxlength="120">
+                <button type="button" id="rename" class="icon-btn" title="Edit patch name" aria-label="Edit patch name">
+                  <svg class="icon" aria-hidden="true"><use href="#i-pencil"/></svg>
+                </button>
+              </div>
+            </div>
             <input type="file" id="file" class="visually-hidden" accept=".syx,application/octet-stream">
-            <label for="file" class="btn btn--teal">Load SysEx</label>
-            <button type="button" id="reset" class="btn btn--black">Clear All</button>
-            <p id="load-status" class="status status--ok" role="status" aria-live="polite"></p>
+            <label for="file" id="open" class="btn btn--teal btn--icon" role="button" tabindex="0">
+              <svg class="icon" aria-hidden="true"><use href="#i-open"/></svg><span>Open</span>
+            </label>
+            <div class="btn-pair">
+              <button type="button" id="new" class="btn btn--black btn--icon">
+                <svg class="icon" aria-hidden="true"><use href="#i-new"/></svg><span>New</span>
+              </button>
+              <button type="button" id="reset" class="btn btn--black btn--icon">
+                <svg class="icon" aria-hidden="true"><use href="#i-clear"/></svg><span>Clear</span>
+              </button>
+            </div>
             <p id="load-error" class="status status--error" role="alert" hidden>ERROR IN SYSEX FILE - NOT LOADED!! <span id="load-error-detail"></span></p>
           </div>
         </section>
@@ -56,7 +83,9 @@
       </div>
       <div id="sections"></div>
       <div class="actions">
-        <button type="submit" class="btn btn--accent go">Generate SysEx</button>
+        <button type="submit" class="btn btn--accent btn--icon go">
+          <svg class="icon" aria-hidden="true"><use href="#i-save"/></svg><span>Download SysEx</span>
+        </button>
       </div>
     </form>
   </div>

@@ -3,6 +3,10 @@
  * End-to-end tests of the static site in a real browser (Playwright driving
  * the locally installed Chrome, or Edge). Real file uploads, real downloads.
  *
+ * The page edits a PatchDocument in memory. Each test does something on the
+ * page, does the same with the library here in Node, and checks that the
+ * page's document equals the library's and that every control shows it.
+ *
  * Skipped when playwright-core is not installed or no Chrome/Edge is found.
  * Override the browser with MB_BROWSER_CHANNEL=chrome|msedge|chromium.
  */
@@ -12,9 +16,9 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { createServer } = require('../tools/serve');
-const { MB, referencePatches, GENERATED_DIR, hexGroups } = require('./helpers');
+const { MB, referencePatches, GENERATED_DIR, hexGroups, typedValue, rng } = require('./helpers');
 
-const { MutantBrainPatch, Form } = MB;
+const { MutantBrainPatch, Form, Editor, PatchDocument } = MB;
 
 let chromium = null;
 try { ({ chromium } = require('playwright-core')); } catch { /* optional dev dependency */ }
@@ -63,6 +67,10 @@ async function openPage(t, viewport) {
   return page;
 }
 
+// ---------------------------------------------------------------------------
+// What the page shows, and what it holds in memory
+// ---------------------------------------------------------------------------
+
 const domValues = (page) => page.evaluate(() => {
   const v = {};
   document.querySelectorAll('#sysex select').forEach((s) => { v[s.name] = s.value; });
@@ -73,38 +81,94 @@ const domEnabled = (page) => page.evaluate(() => {
   document.querySelectorAll('#sysex select').forEach((s) => { v[s.name] = !s.disabled; });
   return v;
 });
-/** What the BROWSER itself would submit for the form (native FormData rules). */
-const nativeFormData = (page) => page.evaluate(() => Object.fromEntries(new FormData(document.getElementById('sysex'))));
+/** The page's PatchDocument (as plain data). */
+const pageDocument = (page) => page.evaluate(() => window.MutantBrainApp.document());
+
+/** Option value each dropdown should show for a state: the Editor value as a string. */
+const shownValues = (state) => Object.fromEntries(Editor.view(state).fields.map((f) => [f.id, String(f.value)]));
+const shownEnabled = (state) => Object.fromEntries(Editor.view(state).fields.map((f) => [f.id, f.enabled]));
+/** A form value of the original site as the option value of the page's dropdown. */
+const optionValue = (name, formValue) => String(typedValue(name, formValue));
+
+/** The page holds `expected` and every control shows it. */
+async function assertPageShows(page, expected, label = '') {
+  const doc = await pageDocument(page);
+  assert.equal(doc.name, expected.name, `${label} name`);
+  assert.equal(doc.modified, expected.modified, `${label} modified`);
+  assert.deepEqual(doc.patch, JSON.parse(JSON.stringify(expected.patch)), `${label} settings`);
+  assert.deepEqual(await domValues(page), shownValues(expected.patch), `${label} dropdown values`);
+  assert.deepEqual(await domEnabled(page), shownEnabled(expected.patch), `${label} enabled dropdowns`);
+  assert.equal(await page.inputValue('#patch-name'), expected.name, `${label} name field`);
+  const intro = await page.evaluate(() => [...document.querySelectorAll('.loader__body > p:not(.status)')].filter((p) => !p.hidden).map((p) => p.textContent));
+  const loaded = (await paneState(page)).loaded;
+  assert.deepEqual(intro, [loaded
+    ? 'Editing patch. Download it to save it, or create a new patch to start over.'
+    : 'Open a Mutant Brain SysEx file to edit it, or start a new patch from scratch!'], `${label} intro`);
+}
 
 async function upload(page, name, bytes) {
   await page.setInputFiles('#file', { name, mimeType: 'application/octet-stream', buffer: Buffer.from(bytes) });
 }
-async function waitLoaded(page, name) {
-  await page.waitForFunction((n) => document.getElementById('load-status').textContent === `Loaded ${n}`, name);
-}
-async function downloadSysex(page) {
+/** The patch pane's title, and whether it shows a loaded file (teal pane and name box). */
+const paneState = (page) => page.evaluate(() => ({
+  title: document.getElementById('patch-title').textContent,
+  loaded: document.getElementById('patch-pane').classList.contains('loader--loaded'),
+}));
+/** Wait until the file is open: an unmodified document named after it, and the pane says "Patch Loaded". */
+const waitOpened = (page, fileName) => page.waitForFunction((name) => {
+  const doc = window.MutantBrainApp.document();
+  return doc.name === name && !doc.modified && document.getElementById('patch-pane').classList.contains('loader--loaded');
+}, PatchDocument.nameFromFileName(fileName));
+
+/** Press "Generate SysEx"; returns the downloaded file's name and bytes. */
+async function download(page) {
   const [dl] = await Promise.all([page.waitForEvent('download'), page.click('button.go')]);
-  assert.equal(dl.suggestedFilename(), 'mutantbrain.syx');
   const file = path.join(os.tmpdir(), `mb-dl-${process.pid}-${Math.random().toString(36).slice(2)}.syx`);
   await dl.saveAs(file);
   const bytes = fs.readFileSync(file);
   fs.rmSync(file, { force: true });
-  return bytes;
+  return { fileName: dl.suggestedFilename(), bytes };
+}
+
+/** Pick options the way a user does (each fires 'change'), in order. */
+const pickOnPage = (page, picks) => page.evaluate((list) => {
+  for (const [name, value] of list) {
+    const s = document.getElementById(name);
+    s.value = value;
+    s.dispatchEvent(new Event('change', { bubbles: true }));
+  }
+}, picks);
+
+/** The same picks with the library. */
+function pickInNode(doc, picks) {
+  for (const [name, value] of picks) {
+    const ref = Editor.refOf(name);
+    const option = Editor.view(doc.patch).get(ref).options.find((o) => String(o.value) === value);
+    doc = PatchDocument.setValue(doc, ref, option.value);
+  }
+  return doc;
 }
 
 const skip = () => skipReason;
 
+// ---------------------------------------------------------------------------
+// The page
+// ---------------------------------------------------------------------------
+
 test('renders every field with exactly the library schema', async (t) => {
   if (skip()) return t.skip(skip());
   const page = await openPage(t);
-  assert.equal(await page.title(), 'Mutant Brain Surgery');
   assert.equal(await page.textContent('h2'), 'SysEx Patch Builder for the Mutant Brain Eurorack Module');
   const selects = await page.evaluate(() => [...document.querySelectorAll('#sysex select')].map((s) => ({
     name: s.name, options: [...s.options].map((o) => [o.value, o.textContent, o.disabled]),
   })));
   assert.deepEqual(selects.map((s) => s.name), Form.FIELDS.map((f) => f.name));
+  const view = Editor.view(Editor.create());
   for (const s of selects) {
-    assert.deepEqual(s.options, Form.field(s.name).options.map((o) => [o.value, o.label, !!o.disabled]), s.name);
+    // option i is the Editor's option i, labelled as on the original site
+    const editorOptions = view.get(Editor.refOf(s.name)).options;
+    assert.deepEqual(s.options.map((o) => o[0]), editorOptions.map((o) => String(o.value)), `${s.name} values`);
+    assert.deepEqual(s.options.map((o) => [o[1], o[2]]), Form.field(s.name).options.map((o) => [o.label, !!o.disabled]), `${s.name} labels`);
   }
   // setting names with descriptions: column headings, or row names in the single-item (globals) pane
   const headers = await page.evaluate(() => [...document.querySelectorAll('table.grid td[title]')].map((td) => td.textContent));
@@ -114,31 +178,62 @@ test('renders every field with exactly the library schema', async (t) => {
   assert.deepEqual(links, [Form.FIRMWARE_URL, Form.FIRMWARE_URL], 'firmware note under CV and gate sections');
   assert.equal(await page.evaluate(() => getComputedStyle(document.querySelector('button.go')).position), 'static');
   assert.equal(await page.evaluate(() => getComputedStyle(document.querySelector('.actions')).position), 'sticky', 'download bar stays in reach');
+  // the patch panel
+  // buttons: an icon beside the text
+  for (const [sel, text, icon] of [['#open', 'Open', 'i-open'], ['#new', 'New', 'i-new'], ['#reset', 'Clear', 'i-clear'], ['button.go', 'Download SysEx', 'i-save'], ['#rename', '', 'i-pencil']]) {
+    const b = await page.evaluate((s) => {
+      const node = document.querySelector(s);
+      const svg = node.querySelector('svg.icon');
+      const box = svg.getBoundingClientRect();
+      return { text: node.textContent.trim(), icon: svg.querySelector('use').getAttribute('href'), w: box.width, h: box.height };
+    }, sel);
+    assert.equal(b.text, text, sel);
+    assert.equal(b.icon, `#${icon}`, `${sel} icon`);
+    assert.ok(b.w >= 16 && b.w <= 32 && b.w === b.h, `${sel} icon is square and 16-32px (${b.w}x${b.h})`);
+  }
+  assert.equal(await page.getAttribute('#rename', 'aria-label'), 'Edit patch name');
+  assert.equal(await page.getAttribute('label[for="file"]', 'id'), 'open');
+  assert.equal(await page.textContent('label[for="patch-name"]'), 'Patch name');
+  assert.equal(await page.locator('#load').count(), 0, 'no separate Load button');
+  assert.equal(await page.locator('#load-status').count(), 0, 'no status line');
+  assert.deepEqual(await paneState(page), { title: 'Load Patch', loaded: false });
+  const border = (sel) => page.evaluate((s) => getComputedStyle(document.querySelector(s)).borderTopColor, sel);
+  const before = [await border('#patch-pane'), await border('.field__input')];
+  await upload(page, referencePatches()[0].name, referencePatches()[0].bytes);
+  await waitOpened(page, referencePatches()[0].name);
+  assert.deepEqual(await paneState(page), { title: 'Patch Loaded', loaded: true });
+  const after = [await border('#patch-pane'), await border('.field__input')];
+  assert.equal(after[0], 'rgb(70, 173, 185)', 'teal pane border');
+  assert.equal(after[1], after[0], 'name box border matches the pane');
+  assert.notDeepEqual(after, before);
 });
 
-test('fresh page: values, enabled state and downloaded file match the original site', async (t) => {
+test('fresh page: a new, unmodified patch; downloads what the original site did', async (t) => {
   if (skip()) return t.skip(skip());
   const page = await openPage(t);
-  assert.deepEqual(await domValues(page), Form.defaultFormValues());
-  assert.deepEqual(await domEnabled(page), Form.enabledFields({}));
-  assert.deepEqual(await nativeFormData(page), Form.submittedValues({}));
-  const bytes = await downloadSysex(page);
+  const doc = PatchDocument.create();
+  await assertPageShows(page, doc, 'fresh');
+  assert.deepEqual(await domValues(page), Object.fromEntries(Object.entries(Form.defaultFormValues()).map(([n, v]) => [n, optionValue(n, v)])),
+    'same choices as a fresh page of the original site');
+  assert.equal(await page.title(), 'untitled - Mutant Brain Surgery');
+  const { fileName, bytes } = await download(page);
+  assert.equal(fileName, 'untitled.syx');
   assert.equal(hexGroups(bytes), hexGroups(MutantBrainPatch.fromFormValues({}).toSysex()));
 });
 
-test('uploading each reference patch, then downloading, gives the original site\'s output', async (t) => {
+test('opening each reference patch, then saving it, gives the original site\'s output', async (t) => {
   if (skip()) return t.skip(skip());
   const page = await openPage(t);
   for (const { name, bytes } of referencePatches()) {
     await upload(page, name, bytes);
-    await waitLoaded(page, name);
-    const patch = MutantBrainPatch.fromSysex(bytes);
-    assert.deepEqual(await domValues(page), patch.toFormValues(), `${name} values`);
-    assert.deepEqual(await domEnabled(page), Form.enabledFields(patch.toFormValues()), `${name} enabled`);
-    assert.deepEqual(await nativeFormData(page), Form.submittedValues(patch.toFormValues()), `${name} native FormData`);
-    const out = await downloadSysex(page);
-    assert.equal(hexGroups(out), hexGroups(patch.normalize().toSysex()), `${name} download`);
-    if (name !== 'AlesisNitro.syx') assert.equal(hexGroups(out), hexGroups(bytes), `${name} unchanged`);
+    await waitOpened(page, name);
+    const doc = PatchDocument.open(name, bytes);
+    await assertPageShows(page, doc, name);
+    const out = await download(page);
+    assert.equal(out.fileName, PatchDocument.fileName(doc), `${name} file name`);
+    assert.equal(hexGroups(out.bytes), hexGroups(MutantBrainPatch.fromSysex(bytes).normalize().toSysex()), `${name} download`);
+    if (name !== 'AlesisNitro.syx') assert.equal(hexGroups(out.bytes), hexGroups(bytes), `${name} unchanged`);
+    assert.equal((await pageDocument(page)).modified, false, `${name} saved`);
   }
 });
 
@@ -148,23 +243,53 @@ test('generated fixtures through the real DOM (form fixtures + upload fixtures)'
   const page = await openPage(t);
   for (const f of manifest.fixtures) {
     const golden = fs.readFileSync(path.join(GENERATED_DIR, f.file));
+    let expected;
     if (f.kind === 'form') {
-      // start from scratch, then make the user's selections (each fires 'change')
-      await page.click('#reset');
-      await page.evaluate((values) => {
-        for (const [name, value] of Object.entries(values)) {
-          const s = document.getElementById(name);
-          s.value = value;
-          s.dispatchEvent(new Event('change', { bubbles: true }));
-        }
-      }, f.values);
-      assert.deepEqual(await nativeFormData(page), Form.submittedValues(f.values), `${f.file} native FormData`);
+      // new patch, then the user's selections in page order
+      await page.click('#new');
+      const picks = Object.entries(f.values).map(([name, value]) => [name, optionValue(name, value)]);
+      await pickOnPage(page, picks);
+      expected = pickInNode(PatchDocument.create(), picks);
     } else {
       await upload(page, f.input, fs.readFileSync(path.join(GENERATED_DIR, f.input)));
-      await waitLoaded(page, f.input);
+      await waitOpened(page, f.input);
+      expected = PatchDocument.open(f.input, fs.readFileSync(path.join(GENERATED_DIR, f.input)));
     }
-    const built = await page.evaluate(() => Array.from(window.MutantBrainApp.buildSysex()));
-    assert.equal(hexGroups(built), hexGroups(golden), f.file);
+    await assertPageShows(page, expected, f.file);
+    assert.equal(hexGroups(PatchDocument.toSysex(await pageDocument(page))), hexGroups(golden), f.file);
+  }
+});
+
+test('every dropdown edits its own setting of the document', async (t) => {
+  if (skip()) return t.skip(skip());
+  const page = await openPage(t);
+  const r = rng(0xF1E1D);
+  for (let round = 0; round < 4; round++) {
+    // every field once, in random order, each set to an option a user can pick
+    const names = Form.FIELDS.map((f) => f.name).sort(() => r() - 0.5);
+    let expected = PatchDocument.create();
+    await page.click('#new');
+    for (const name of names) {
+      const options = Editor.view(expected.patch).get(Editor.refOf(name)).options.filter((o) => !o.disabled);
+      const pick = [name, String(r.pick(options).value)];
+      expected = pickInNode(expected, [pick]);
+      await pickOnPage(page, [pick]);
+    }
+    await assertPageShows(page, expected, `round ${round}`);
+  }
+  // one setting at a time: only that setting of the document changes
+  const fresh = PatchDocument.create();
+  for (const name of ['global.chan', 'in3.max_note', 'cv4.trans', 'gt12.dur', 'gt7.thrs']) {
+    await page.click('#new');
+    const current = Editor.get(fresh.patch, Editor.refOf(name));
+    const options = Editor.view(fresh.patch).get(Editor.refOf(name)).options.filter((o) => !o.disabled && o.value !== current);
+    const value = String(options[options.length - 1].value);
+    await pickOnPage(page, [[name, value]]);
+    const doc = await pageDocument(page);
+    assert.equal(String(Editor.get(doc.patch, Editor.refOf(name))), value, name);
+    const changed = Editor.view(doc.patch).fields.filter((f) => String(f.value) !== shownValues(fresh.patch)[f.id]).map((f) => f.id);
+    assert.deepEqual(changed, [name], `${name} changes nothing else`);
+    assert.equal(doc.modified, true);
   }
 });
 
@@ -174,6 +299,7 @@ test('a user really clicking through the dropdowns', async (t) => {
   assert.equal(await page.isDisabled('select[name="in1.chan"]'), true);
   await page.selectOption('select[name="in1.src"]', '1');
   assert.equal(await page.isDisabled('select[name="in1.chan"]'), false, 'enabling the input enables its fields');
+  assert.equal(await page.title(), '• untitled - Mutant Brain Surgery', 'title marks unsaved changes');
   await page.selectOption('select[name="in1.chan"]', '3');
   await page.selectOption('select[name="in1.prty"]', { label: '2 note chord' });
   await page.selectOption('select[name="cv1.src"]', { label: 'Note input #1' });
@@ -184,63 +310,162 @@ test('a user really clicking through the dropdowns', async (t) => {
   await page.selectOption('select[name="gt1.src"]', { label: 'Clock Tick' });
   await page.selectOption('select[name="gt1.div"]', { label: '1/4' });
   await page.selectOption('select[name="gt1.dur"]', { label: '(retrig)' });
-  const expected = MutantBrainPatch.fromFormValues({
+  const values = {
     'in1.src': '1', 'in1.chan': '3', 'in1.prty': '9', 'cv1.src': '11', 'cv1.trans': '52',
     'cv2.src': '11', 'cv2.event': '20', 'gt1.src': '20', 'gt1.div': '24', 'gt1.dur': 'retrig',
-  }).toSysex();
-  assert.equal(hexGroups(await downloadSysex(page)), hexGroups(expected));
+  };
+  await assertPageShows(page, pickInNode(PatchDocument.create(), Object.entries(values).map(([n, v]) => [n, optionValue(n, v)])));
+  const out = await download(page);
+  assert.equal(hexGroups(out.bytes), hexGroups(MutantBrainPatch.fromFormValues(values).toSysex()));
+  assert.equal((await pageDocument(page)).modified, false, 'saved');
+  assert.equal(await page.title(), 'untitled - Mutant Brain Surgery');
 });
 
-test('selected-but-disabled CC option is not submitted by the real browser either', async (t) => {
+test('selected-but-disabled CC option is shown but saved as 0, like the original site', async (t) => {
   if (skip()) return t.skip(skip());
   const page = await openPage(t);
   await upload(page, 'cc6.syx', [0xF0, 0x00, 0x7F, 0x15, 21, 1, 2, 6, 0xF7]);
-  await waitLoaded(page, 'cc6.syx');
+  await waitOpened(page, 'cc6.syx');
   assert.equal(await page.inputValue('select[name="cv1.cc"]'), '6');
   assert.equal(await page.isDisabled('select[name="cv1.cc"]'), false);
-  const fd = await nativeFormData(page);
-  assert.equal(fd['cv1.src'], '2');
-  assert.ok(!('cv1.cc' in fd), 'browser omits a select whose selected option is disabled');
-  const out = MutantBrainPatch.parseParams(await downloadSysex(page));
+  const out = MutantBrainPatch.parseParams((await download(page)).bytes);
   assert.deepEqual(out.find((p) => p[0] === 21 && p[1] === 1), [21, 1, 2, 0]);
 });
 
-test('bad files show the error and leave the form alone; a good file clears it', async (t) => {
+// ---------------------------------------------------------------------------
+// The patch panel
+// ---------------------------------------------------------------------------
+
+test('bad files show the error and leave the document alone; a good file clears it', async (t) => {
   if (skip()) return t.skip(skip());
   const page = await openPage(t);
   const ref = referencePatches()[1];
   await upload(page, ref.name, ref.bytes);
-  await waitLoaded(page, ref.name);
-  const before = await domValues(page);
+  await waitOpened(page, ref.name);
+  await page.selectOption('select[name="global.chan"]', '4'); // an unsaved edit
+  const before = await pageDocument(page);
   for (const [name, bytes] of [['yamaha.syx', [0xF0, 0x43, 0x10, 0x4C, 0xF7]], ['cut.syx', [0xF0, 0x00, 0x7F, 0x15, 1, 2]], ['empty.syx', []]]) {
     await upload(page, name, bytes);
     await page.waitForSelector('#load-error:not([hidden])');
     assert.match(await page.textContent('#load-error'), /ERROR IN SYSEX FILE - NOT LOADED!!/);
-    assert.deepEqual(await domValues(page), before, `${name} leaves form unchanged`);
+    assert.deepEqual(await pageDocument(page), before, `${name} leaves the document unchanged`);
+    assert.deepEqual(await domValues(page), shownValues(before.patch), `${name} leaves the form unchanged`);
   }
   await upload(page, ref.name, ref.bytes);
-  await waitLoaded(page, ref.name);
+  await waitOpened(page, ref.name);
   assert.equal(await page.isHidden('#load-error'), true);
-  await page.click('#reset');
-  assert.deepEqual(await domValues(page), Form.defaultFormValues(), 'Clear All resets the form');
 });
 
-test('choosing a file loads it immediately; choosing the same file again reloads it', async (t) => {
+test('Open Patch: the button opens the file picker; choosing a file opens it, again too', async (t) => {
   if (skip()) return t.skip(skip());
   const page = await openPage(t);
-  assert.equal(await page.locator('#load').count(), 0, 'no separate Load button');
   const ref = referencePatches()[0];
-  const expected = MutantBrainPatch.fromSysex(ref.bytes).toFormValues();
-  // the visible "Choose a .syx file..." button is a <label> for the hidden input
-  const [chooser] = await Promise.all([page.waitForEvent('filechooser'), page.click('label[for="file"]')]);
+  const expected = PatchDocument.open(ref.name, ref.bytes);
+  const [chooser] = await Promise.all([page.waitForEvent('filechooser'), page.click('#open')]);
   await chooser.setFiles({ name: ref.name, mimeType: 'application/octet-stream', buffer: ref.bytes });
-  await waitLoaded(page, ref.name);
-  assert.deepEqual(await domValues(page), expected);
+  await waitOpened(page, ref.name);
+  await assertPageShows(page, expected, 'opened');
   await page.selectOption('select[name="global.chan"]', '3'); // user edits...
-  await page.evaluate(() => { document.getElementById('load-status').textContent = ''; });
+  assert.equal((await pageDocument(page)).modified, true);
   await upload(page, ref.name, ref.bytes); // ...then picks the very same file again
-  await waitLoaded(page, ref.name);
-  assert.deepEqual(await domValues(page), expected, 'same file re-loaded');
+  await waitOpened(page, ref.name);
+  await assertPageShows(page, expected, 're-opened');
+  // keyboard: the button is focusable and Enter opens the picker
+  await page.focus('#open');
+  const [again] = await Promise.all([page.waitForEvent('filechooser'), page.keyboard.press('Enter')]);
+  assert.ok(again);
+});
+
+test('New Patch: fresh settings and a new name, ready to type', async (t) => {
+  if (skip()) return t.skip(skip());
+  const page = await openPage(t);
+  const ref = referencePatches()[0];
+  await upload(page, ref.name, ref.bytes);
+  await waitOpened(page, ref.name);
+  await page.selectOption('select[name="global.chan"]', '3');
+  await page.click('#new');
+  await assertPageShows(page, PatchDocument.create(), 'new');
+  assert.deepEqual(await paneState(page), { title: 'Load Patch', loaded: false }, 'a new patch is not a loaded file');
+  // the name is selected, so typing replaces it
+  assert.equal(await page.evaluate(() => document.activeElement.id), 'patch-name');
+  await page.keyboard.type('Kick & Snare');
+  await assertPageShows(page, PatchDocument.rename(PatchDocument.create(), 'Kick & Snare'), 'typed name');
+  const out = await download(page);
+  assert.equal(out.fileName, 'Kick & Snare.syx');
+  assert.equal(hexGroups(out.bytes), hexGroups(PatchDocument.toSysex(PatchDocument.create())));
+});
+
+test('Clear All: fresh settings, same name', async (t) => {
+  if (skip()) return t.skip(skip());
+  const page = await openPage(t);
+  const ref = referencePatches()[1];
+  await upload(page, ref.name, ref.bytes);
+  await waitOpened(page, ref.name);
+  await page.click('#reset');
+  const expected = PatchDocument.clear(PatchDocument.open(ref.name, ref.bytes));
+  await assertPageShows(page, expected, 'cleared');
+  assert.equal(expected.name, ref.name.replace(/\.syx$/i, ''));
+  assert.deepEqual(await paneState(page), { title: 'Patch Loaded', loaded: true }, 'still the loaded file');
+  const out = await download(page);
+  assert.equal(out.fileName, ref.name);
+  assert.equal(hexGroups(out.bytes), hexGroups(MutantBrainPatch.fromFormValues({}).toSysex()));
+});
+
+test('the name field renames the patch; the download is named after it', async (t) => {
+  if (skip()) return t.skip(skip());
+  const page = await openPage(t);
+  let expected = PatchDocument.create();
+  for (const [name, fileName] of [['Lead', 'Lead.syx'], ['my/kit: v2', 'my-kit- v2.syx'], ['', 'untitled.syx'], ['bass.syx', 'bass.syx']]) {
+    await page.fill('#patch-name', name);
+    expected = PatchDocument.rename(expected, name);
+    await assertPageShows(page, expected, JSON.stringify(name));
+    assert.equal((await download(page)).fileName, fileName, JSON.stringify(name));
+  }
+  // renaming does not discard edits, and is not an edit of the settings
+  await page.selectOption('select[name="global.chan"]', '5');
+  await page.fill('#patch-name', 'Edited');
+  const doc = await pageDocument(page);
+  assert.equal(doc.modified, true);
+  assert.equal(Editor.get(doc.patch, { section: 'globals', control: 'channel' }), 5);
+});
+
+test('the name reads as text until edited: click or pencil to edit, Enter to finish, Escape to undo', async (t) => {
+  if (skip()) return t.skip(skip());
+  const page = await openPage(t);
+  const editing = () => page.evaluate(() => document.activeElement.id === 'patch-name');
+  const boxFill = () => page.evaluate(() => getComputedStyle(document.querySelector('.field__input')).backgroundColor);
+  await page.mouse.move(0, 0);
+  assert.equal(await editing(), false);
+  assert.equal(await boxFill(), 'rgba(0, 0, 0, 0)', 'no fill while showing the name');
+  // pencil: edit with the whole name selected, so typing replaces it
+  await page.click('#rename');
+  assert.equal(await editing(), true);
+  assert.notEqual(await boxFill(), 'rgba(0, 0, 0, 0)', 'editor fill while editing');
+  assert.deepEqual(await page.evaluate(() => { const i = document.getElementById('patch-name'); return [i.selectionStart, i.selectionEnd]; }), [0, 'untitled'.length]);
+  await page.keyboard.type('Bassline');
+  await page.keyboard.press('Enter');
+  assert.equal(await editing(), false, 'Enter finishes editing');
+  assert.equal((await pageDocument(page)).name, 'Bassline');
+  // Enter does not submit the form (no download)
+  let downloads = 0;
+  page.on('download', () => downloads++);
+  // clicking the name edits it too; Escape puts the name back
+  await page.click('#patch-name');
+  assert.equal(await editing(), true);
+  await page.keyboard.press('End');
+  await page.keyboard.type(' 2');
+  assert.equal((await pageDocument(page)).name, 'Bassline 2', 'renames as you type');
+  await page.keyboard.press('Escape');
+  assert.equal(await editing(), false);
+  assert.equal((await pageDocument(page)).name, 'Bassline', 'Escape undoes this edit');
+  assert.equal(await page.inputValue('#patch-name'), 'Bassline');
+  // clicking elsewhere finishes too
+  await page.click('#rename');
+  await page.keyboard.type('Lead');
+  await page.click('h1');
+  assert.equal(await editing(), false);
+  assert.equal((await pageDocument(page)).name, 'Lead');
+  assert.equal(downloads, 0);
 });
 
 test('phone width: page itself does not scroll sideways (tables scroll in place)', async (t) => {
