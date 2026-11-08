@@ -1,7 +1,13 @@
 {
   "title": "CV.OCD Patch Builder",
+  "pageTitle": "CV.OCD Patch Builder: SysEx Editor for the CV.OCD",
+  "shortName": "CV.OCD",
   "description": "SysEx patch builder for the CV.OCD MIDI to CV interface by Sixty Four Pixels",
   "themeColor": "#111213",
   "product": "CV.OCD",
-  "firmwareUrl": "https://github.com/hotchk155/cvocd.a"
+  "firmwareUrl": "https://github.com/hotchk155/cvocd.a",
+  "url": "https://cvocd.web.app",
+  "socialImageAlt": "cv.ocd SysEx patch builder, above the CV.OCD MIDI to CV interface",
+  "author": "Sixty Four Pixels",
+  "authorUrl": "https://www.tindie.com/products/hotchk155/cvocd-a-super-flexible-midi-to-cv-box/"
 }

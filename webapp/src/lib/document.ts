@@ -34,7 +34,7 @@ export interface SavedPatch {
 }
 
 /** Name of a new patch. */
-export const DEFAULT_PATCH_NAME = 'untitled';
+export const DEFAULT_PATCH_NAME = 'New Patch';
 
 /** File name extension of a patch file. */
 export const PATCH_FILE_EXTENSION = '.syx';
@@ -53,7 +53,7 @@ function sameSettings(a: PatchState, b: PatchState): boolean {
 /**
  * A name usable as a file name on any system: characters that are not
  * allowed in file names become "-", control characters, a trailing ".syx"
- * and leading dots are removed, and an empty result becomes "untitled".
+ * and leading dots are removed, and an empty result becomes "New Patch".
  */
 function fileStem(name: string): string {
   const stem = name

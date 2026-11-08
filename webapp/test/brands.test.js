@@ -36,12 +36,15 @@ test('there are the two brands, and the default is Mutant Brain Surgery', async 
 test('every brand folder is complete, with a valid brand.json', async () => {
   const { listBrands, brandConfig } = await brands();
   for (const brand of listBrands()) {
-    for (const f of ['brand.json', 'head.html', 'header.html', 'hero.html', 'theme.css']) {
+    for (const f of ['brand.json', 'head.html', 'header.html', 'hero.html', 'theme.css',
+      'favicon.ico', 'apple-touch-icon.png', 'img/social.png', 'art/social.html', 'art/icon.html']) {
       assert.ok(fs.existsSync(path.join(root, 'brands', brand, f)), `brands/${brand}/${f}`);
     }
     const config = brandConfig(brand);
-    assert.deepEqual(Object.keys(config).sort(), ['description', 'firmwareUrl', 'product', 'themeColor', 'title']);
+    assert.deepEqual(Object.keys(config).sort(), ['author', 'authorUrl', 'description', 'firmwareUrl', 'pageTitle', 'product', 'shortName', 'socialImageAlt', 'themeColor', 'title', 'url']);
+    assert.ok([...config.shortName].length <= 12, `${brand}: shortName fits a home screen`);
     assert.match(config.firmwareUrl, /^https:\/\//);
+    assert.match(config.url, /^https:\/\/[^/]+$/, `${brand}: url is https, no trailing slash`);
     assert.match(config.themeColor, /^#[0-9a-f]{6}$/i);
   }
 });
@@ -55,7 +58,7 @@ test('each brand page: slots filled in, every element the app needs, brand value
     const config = brandConfig(brand);
     assert.doesNotMatch(html, /\{\{|\}\}/, `${brand}: no unfilled slots`);
     for (const id of ids) assert.match(html, new RegExp(`id="${id}"`), `${brand}: #${id}`);
-    assert.match(html, new RegExp(`<title>${config.title.replace(/\./g, '\\.')}</title>`), `${brand}: title`);
+    assert.ok(html.includes(`<title>${config.pageTitle}</title>`), `${brand}: title`);
     assert.ok(html.includes(`<body data-firmware-url="${config.firmwareUrl}">`), `${brand}: firmware link`);
     assert.ok(html.includes(`Open a ${config.product} SysEx file`), `${brand}: product name in the intro`);
     assert.ok(html.includes(read('brands', brand, 'hero.html').trimEnd()), `${brand}: hero partial`);
@@ -92,10 +95,86 @@ test('the build output is the rendered page and base.css + theme.css', async () 
     assert.ok(css.indexOf(read('site', 'base.css')) === 0, `${brand}: base first`);
     assert.ok(css.endsWith(read('brands', brand, 'theme.css')), `${brand}: theme last`);
     // brand source files are not published, assets are
-    for (const f of ['brand.json', 'head.html', 'header.html', 'hero.html', 'theme.css']) {
+    for (const f of ['brand.json', 'head.html', 'header.html', 'hero.html', 'theme.css', 'art']) {
       assert.ok(!fs.existsSync(path.join(root, 'dist', brand, f)), `dist/${brand}/${f} not published`);
     }
     assert.ok(fs.existsSync(path.join(root, 'dist', brand, 'img')), `dist/${brand}/img`);
+  }
+});
+
+/** Width and height of a PNG (from its IHDR chunk). */
+const pngSize = (buf) => [buf.readUInt32BE(16), buf.readUInt32BE(20)];
+
+test('link previews and icons: absolute social tags, and every linked file exists at the right size', async () => {
+  const { listBrands, brandConfig, contentVersion } = await brands();
+  for (const brand of listBrands()) {
+    const { url, title, description, socialImageAlt } = brandConfig(brand);
+    const version = contentVersion(path.join(root, 'brands', brand, 'img', 'social.png'));
+    assert.match(version, /^[0-9a-f]{10}$/);
+    const html = read('dist', brand, 'index.html');
+    const meta = (attr, key) => (html.match(new RegExp(`<meta ${attr}="${key}" content="([^"]*)">`)) || [])[1];
+    const unescape = (s) => s && s.replace(/&quot;/g, '"').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
+    assert.equal(unescape(meta('property', 'og:title')), title, `${brand}: og:title`);
+    assert.equal(unescape(meta('property', 'og:description')), description, `${brand}: og:description`);
+    assert.equal(meta('property', 'og:url'), `${url}/`, `${brand}: og:url`);
+    // absolute, and versioned by content so a new image isn't served from preview caches
+    assert.equal(meta('property', 'og:image'), `${url}/img/social.png?v=${version}`, `${brand}: og:image`);
+    assert.equal(unescape(meta('property', 'og:image:alt')), socialImageAlt, `${brand}: og:image:alt`);
+    assert.equal(meta('name', 'twitter:card'), 'summary_large_image', `${brand}: twitter card`);
+    assert.ok(html.includes(`<link rel="canonical" href="${url}/">`), `${brand}: canonical`);
+    assert.doesNotMatch(html, /href="data:/, `${brand}: no placeholder icon`);
+    // the preview image is the size the tags say
+    const social = fs.readFileSync(path.join(root, 'dist', brand, 'img', 'social.png'));
+    assert.deepEqual(pngSize(social), [Number(meta('property', 'og:image:width')), Number(meta('property', 'og:image:height'))], `${brand}: social.png size`);
+    assert.ok(social.length < 1024 * 1024, `${brand}: social.png under 1 MB (${social.length} bytes)`);
+    // every icon the page links to is in the build
+    const icons = [...html.matchAll(/<link rel="(icon|apple-touch-icon)" href="([^"]+)"/g)].map((m) => [m[1], m[2]]);
+    assert.ok(icons.some(([rel, href]) => rel === 'icon' && href === 'favicon.ico'), `${brand}: favicon.ico linked`);
+    assert.ok(icons.some(([rel]) => rel === 'apple-touch-icon'), `${brand}: apple touch icon linked`);
+    for (const [, href] of icons) assert.ok(fs.existsSync(path.join(root, 'dist', brand, href)), `dist/${brand}/${href}`);
+    assert.deepEqual(pngSize(fs.readFileSync(path.join(root, 'dist', brand, 'apple-touch-icon.png'))), [180, 180], `${brand}: apple touch icon 180px`);
+    // favicon.ico: an icon file with 16, 32 and 48 px images
+    const ico = fs.readFileSync(path.join(root, 'dist', brand, 'favicon.ico'));
+    assert.deepEqual([ico.readUInt16LE(0), ico.readUInt16LE(2)], [0, 1], `${brand}: favicon.ico header`);
+    const sizes = Array.from({ length: ico.readUInt16LE(4) }, (_, i) => ico.readUInt8(6 + 16 * i));
+    assert.deepEqual(sizes, [16, 32, 48], `${brand}: favicon.ico sizes`);
+  }
+});
+
+test('site metadata: titles, robots.txt, sitemap, web app manifest and structured data', async () => {
+  const { listBrands, brandConfig, renderRobots, renderSitemap, renderManifest } = await brands();
+  for (const brand of listBrands()) {
+    const config = brandConfig(brand);
+    const dist = (f) => read('dist', brand, f);
+    const html = dist('index.html');
+    // titles: the long one for search results, the site name for the app's tab title, the short one for home screens
+    assert.ok(html.includes(`<title>${config.pageTitle}</title>`), `${brand}: <title>`);
+    assert.ok(html.includes(`<meta name="application-name" content="${config.title}">`), `${brand}: application-name`);
+    assert.ok(html.includes(`<meta name="apple-mobile-web-app-title" content="${config.shortName}">`), `${brand}: home screen name`);
+    // robots.txt allows everything and points at the sitemap, which lists the page
+    assert.equal(dist('robots.txt'), `User-agent: *\nAllow: /\n\nSitemap: ${config.url}/sitemap.xml\n`);
+    assert.match(dist('sitemap.xml'), new RegExp(`<loc>${config.url.replace(/\./g, '\\.')}/</loc>`));
+    // the manifest is linked, valid, and its icons exist at their stated sizes
+    assert.ok(html.includes('<link rel="manifest" href="site.webmanifest">'), `${brand}: manifest linked`);
+    const manifest = JSON.parse(dist('site.webmanifest'));
+    assert.equal(manifest.name, config.title);
+    assert.equal(manifest.short_name, config.shortName);
+    assert.equal(manifest.theme_color, config.themeColor);
+    assert.match(manifest.background_color, /^#[0-9a-f]{6}$/i);
+    for (const icon of manifest.icons) {
+      const png = fs.readFileSync(path.join(root, 'dist', brand, icon.src));
+      assert.equal(`${png.readUInt32BE(16)}x${png.readUInt32BE(20)}`, icon.sizes, `${brand}: ${icon.src}`);
+    }
+    // structured data: valid JSON, describing this site
+    const ld = JSON.parse(html.match(/<script type="application\/ld\+json">(.*?)<\/script>/s)[1]);
+    assert.equal(ld['@type'], 'WebApplication');
+    assert.equal(ld.url, `${config.url}/`);
+    assert.equal(ld.author.name, config.author);
+    // all of them follow --url
+    const other = { url: 'https://patches.example.com' };
+    assert.match(renderRobots(brand, other), /Sitemap: https:\/\/patches\.example\.com\/sitemap\.xml/);
+    assert.match(renderSitemap(brand, other), /<loc>https:\/\/patches\.example\.com\/<\/loc>/);
+    assert.equal(JSON.parse(renderManifest(brand, other)).name, config.title);
   }
 });
 
@@ -136,6 +215,12 @@ test('build options: every brand by default, or one brand by flag or BRAND, opti
   assert.throws(() => buildOptions(['--brand'], {}), /--brand needs a value/);
   assert.throws(() => buildOptions(['--brand', '--out', 'x'], {}), /--brand needs a value/);
   assert.throws(() => buildOptions(['--colour', 'red'], {}), /unknown option --colour/);
+  // --url (or SITE_URL): another public address for one brand's link previews
+  assert.equal(buildOptions(['--brand', 'cvocd', '--url', 'https://patches.example.com/'], {}).sites[0].url, 'https://patches.example.com');
+  assert.equal(buildOptions(['--brand=cvocd'], { SITE_URL: 'https://x.example' }).sites[0].url, 'https://x.example');
+  assert.equal(buildOptions(['--brand', 'cvocd'], {}).sites[0].url, undefined, 'default: the url in brand.json');
+  assert.throws(() => buildOptions(['--url', 'https://x.example'], {}), /--url needs --brand/);
+  assert.throws(() => buildOptions(['--brand', 'cvocd', '--url', 'example.com'], {}), /not an http\(s\) address/);
 });
 
 test('mistakes in a brand are reported clearly', async () => {

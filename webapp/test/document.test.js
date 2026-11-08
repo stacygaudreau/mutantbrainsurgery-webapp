@@ -37,7 +37,7 @@ function assertDocument(doc) {
 }
 
 test('exports', () => {
-  assert.equal(DEFAULT_PATCH_NAME, 'untitled');
+  assert.equal(DEFAULT_PATCH_NAME, 'New Patch');
   assert.equal(PATCH_FILE_EXTENSION, '.syx');
   assert.ok(Object.isFrozen(PatchDocument));
 });
@@ -169,9 +169,9 @@ test('fileName: the name made safe for any file system, plus .syx', () => {
     ['  padded  ', 'padded.syx'],
     ['tab\there\nnewline', 'tabherenewline.syx'],
     ['...hidden', 'hidden.syx'],
-    ['', 'untitled.syx'],
-    ['   ', 'untitled.syx'],
-    ['.syx', 'untitled.syx'],
+    ['', 'New Patch.syx'],
+    ['   ', 'New Patch.syx'],
+    ['.syx', 'New Patch.syx'],
     ['Ünïcödé 🎛', 'Ünïcödé 🎛.syx'],
     ['x'.repeat(300), `${'x'.repeat(120)}.syx`],
   ];

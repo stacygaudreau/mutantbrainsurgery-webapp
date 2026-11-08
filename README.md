@@ -41,6 +41,9 @@ npm run build -- --brand cvocd         # -> webapp/dist/cvocd/
   publish directory `dist/<brand>`.
 - The `BRAND=<brand>` environment variable works instead of `--brand`, and
   `--out <folder>` builds into another folder (empty, or a previous build).
+- Link previews (social cards) need the site's public address. Each brand's
+  `brand.json` has its own; at another address, add `--url https://your.site`
+  (or set `SITE_URL`).
 
 ## Build and test
 
@@ -62,12 +65,13 @@ brand. The page and the layout are shared; a brand supplies only what differs.
 
 | Path | Contents |
 | --- | --- |
-| `site/index.html` | The page, with slots: `{{title}}`, `{{description}}`, `{{themeColor}}`, `{{product}}`, `{{firmwareUrl}}` from `brand.json`; `{{> head}}`, `{{> header}}`, `{{> hero}}` from the brand's `.html` files |
+| `site/index.html` | The page, with slots: `{{title}}`, `{{description}}`, `{{themeColor}}`, `{{product}}`, `{{url}}` and the other values from `brand.json`; `{{> head}}`, `{{> header}}`, `{{> hero}}` from the brand's `.html` files |
 | `site/base.css` | Shared layout and components, driven by CSS variables (listed at its top) |
-| `brands/<name>/brand.json` | Title, description, theme colour, product name, firmware link |
-| `brands/<name>/head.html`, `header.html`, `hero.html` | Fonts, top bar, heading and product image |
+| `brands/<name>/brand.json` | Site name, search title, home-screen name, description, theme colour, product name, firmware link, public address, preview image alt text, author |
+| `brands/<name>/head.html`, `header.html`, `hero.html` | Icons and fonts, top bar, heading and product image |
 | `brands/<name>/theme.css` | The variables, plus colours, fonts and decoration; goes after `base.css` |
-| `brands/<name>/img/`, `fonts/` | Assets, published as they are |
+| `brands/<name>/img/`, `fonts/`, `favicon.*`, `apple-touch-icon.png` | Assets, published as they are |
+| `brands/<name>/art/` | Sources of the link preview image (`img/social.png`) and icons; `node tools/make-brand-images.mjs` renders them (needs Chrome) |
 
 | Brand | Site |
 | --- | --- |
@@ -76,6 +80,9 @@ brand. The page and the layout are shared; a brand supplies only what differs.
 
 To add a brand, copy a brand folder and change it; `npm test` checks that the
 folder is complete and that its theme sets every variable `base.css` uses.
+
+The build also writes each site's `robots.txt`, `sitemap.xml` and
+`site.webmanifest` from `brand.json`.
 
 Without `--brand`, `npm run build` builds every brand, each to `dist/<brand>/`
 (see [Deploy](#deploy-any-static-host)).

@@ -1,0 +1,64 @@
+<!doctype html>
+<!-- Link preview card (Open Graph / Twitter), 1200x630: the site's space hero.
+     Some apps crop previews to a centred square, so everything that matters
+     (logo, title, subtitle) sits in the middle 630x630; the module fills the
+     left of the wide view. Rendered to img/social.png by
+     tools/make-brand-images.mjs. -->
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  @font-face { font-family: "Noyh Black"; src: url("../fonts/noyh_black-webfont.woff2") format("woff2"); }
+  @font-face { font-family: "Noyh Bold"; src: url("../fonts/noyh_bold-webfont.woff2") format("woff2"); }
+  html, body { margin: 0; width: 1200px; height: 630px; overflow: hidden; }
+  body {
+    position: relative;
+    color: #fcfcfc;
+    background-color: #1e2124;
+    /* the site's hero layers (brands/mutantbrain/theme.css), fading a little less */
+    background-image:
+      linear-gradient(180deg, rgba(8, 5, 9, 0.45) 0%, rgba(8, 5, 9, 0) 22%, rgba(30, 33, 36, 0) 60%, rgba(30, 33, 36, 0.85) 100%),
+      url("../img/starfield.svg"),
+      radial-gradient(60% 60% at 50% -10%, rgba(98, 47, 65, 0.55), rgba(98, 47, 65, 0) 70%),
+      radial-gradient(40% 55% at 8% 60%, rgba(95, 61, 79, 0.28), rgba(95, 61, 79, 0) 70%),
+      radial-gradient(55% 60% at 80% 74%, rgba(63, 113, 126, 0.42), rgba(63, 113, 126, 0) 70%),
+      linear-gradient(180deg, #170c13 0%, #15121a 36%, #0f1d22 70%, #1e2124 100%);
+    background-size: 100% 100%, 1200px 700px, 100% 100%, 100% 100%, 100% 100%, 100% 100%;
+    background-repeat: no-repeat;
+  }
+  /* the centred square (x 285-915) that survives a square crop */
+  .safe {
+    position: absolute; left: 285px; top: 0;
+    width: 630px; height: 630px;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    text-align: center;
+  }
+  .brand { display: block; height: 46px; margin-bottom: 52px; }
+  h1 {
+    margin: 0;
+    font: 80px/0.9 "Noyh Black", "Arial Black", sans-serif;
+    text-transform: uppercase;
+    letter-spacing: 0.01em;
+  }
+  p {
+    margin: 30px 0 0;
+    font: 30px/1.2 "Noyh Bold", Arial, sans-serif;
+    max-width: 500px;
+  }
+  /* sides of the wide view */
+  .module {
+    position: absolute; left: 92px; top: 50%; transform: translateY(-50%);
+    height: 520px; width: auto;
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.6), 0 0 90px rgba(63, 113, 126, 0.35);
+  }
+</style>
+</head>
+<body>
+  <img class="module" src="../img/mutantbrain-black.png" alt="">
+  <div class="safe">
+    <img class="brand" src="../img/hexinverter-logo.svg" alt="">
+    <h1>Mutant Brain<br>Surgery</h1>
+    <p>SysEx Patch Builder for the Mutant Brain Eurorack Module</p>
+  </div>
+</body>
+</html>

@@ -13,6 +13,7 @@
  *   npm run build -- --brand cvocd               -> dist/cvocd/
  *   npm run build -- --brand cvocd --out public  -> ./public
  *   BRAND=cvocd npm run build                    -> dist/cvocd/ (for hosts set up with env vars)
+ *   ... --url https://patches.example.com        link previews for that address (or SITE_URL)
  */
 import { build } from 'esbuild';
 import { execFileSync } from 'node:child_process';
@@ -47,7 +48,7 @@ rmSync(at('build'), { recursive: true, force: true });
 // Websites: one per brand, all running the same app.js
 for (const site of options.sites) {
   rmSync(site.out, { recursive: true, force: true }); // checked by buildOptions: empty or a previous build
-  const out = buildBrandSite(site.brand, site.out);
+  const out = buildBrandSite(site.brand, site.out, { url: site.url });
   await build({
     entryPoints: [at('src/app/main.ts')],
     outfile: join(out, 'app.js'),

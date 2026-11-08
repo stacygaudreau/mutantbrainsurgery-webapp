@@ -1,7 +1,13 @@
 {
   "title": "Mutant Brain Surgery",
+  "pageTitle": "Mutant Brain Surgery: SysEx Patch Builder",
+  "shortName": "MB Surgery",
   "description": "SysEx Patch Builder for the Hexinverter Mutant Brain Eurorack Module",
   "themeColor": "#000000",
   "product": "Mutant Brain",
-  "firmwareUrl": "https://www.ericasynths.lv/hexinverter-mutant-brain-2515/"
+  "firmwareUrl": "https://www.ericasynths.lv/hexinverter-mutant-brain-2515/",
+  "url": "https://mutantbrainsurgery.web.app",
+  "socialImageAlt": "Mutant Brain Surgery: SysEx Patch Builder for the Mutant Brain Eurorack Module, beside the black Mutant Brain module",
+  "author": "Hexinverter Électronique",
+  "authorUrl": "https://www.hexinverter.net/"
 }

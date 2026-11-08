@@ -12,9 +12,11 @@ let doc: PatchDocument = PatchDocument.create();
 let view: EditorView = Editor.view(doc.patch);
 
 // Branding comes from the page, so each site (Mutant Brain Surgery, CV.OCD)
-// shares this script: the site name is the page's <title>, and the firmware
-// link is <body data-firmware-url="...">.
-const SITE_TITLE = document.title;
+// shares this script: the site name is <meta name="application-name"> (the
+// <title> is a longer one for search results), and the firmware link is
+// <body data-firmware-url="...">.
+const SITE_TITLE =
+  document.querySelector('meta[name="application-name"]')?.getAttribute('content') || document.title;
 const FIRMWARE_URL = document.body.getAttribute('data-firmware-url') || Form.FIRMWARE_URL;
 
 const selects = new Map<string, HTMLSelectElement>();

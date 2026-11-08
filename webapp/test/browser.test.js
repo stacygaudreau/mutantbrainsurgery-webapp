@@ -239,9 +239,9 @@ test('fresh page: a new, unmodified patch; downloads what the original site did'
   await assertPageShows(page, doc, 'fresh');
   assert.deepEqual(await domValues(page), Object.fromEntries(Object.entries(Form.defaultFormValues()).map(([n, v]) => [n, optionValue(n, v)])),
     'same choices as a fresh page of the original site');
-  assert.equal(await page.title(), 'untitled - Mutant Brain Surgery');
+  assert.equal(await page.title(), 'New Patch - Mutant Brain Surgery');
   const { fileName, bytes } = await download(page);
-  assert.equal(fileName, 'untitled.syx');
+  assert.equal(fileName, 'New Patch.syx');
   assert.equal(hexGroups(bytes), hexGroups(MutantBrainPatch.fromFormValues({}).toSysex()));
 });
 
@@ -323,7 +323,7 @@ test('a user really clicking through the dropdowns', async (t) => {
   assert.equal(await page.isDisabled('select[name="in1.chan"]'), true);
   await page.selectOption('select[name="in1.src"]', '1');
   assert.equal(await page.isDisabled('select[name="in1.chan"]'), false, 'enabling the input enables its fields');
-  assert.equal(await page.title(), '• untitled - Mutant Brain Surgery', 'title marks unsaved changes');
+  assert.equal(await page.title(), '• New Patch - Mutant Brain Surgery', 'title marks unsaved changes');
   await page.selectOption('select[name="in1.chan"]', '3');
   await page.selectOption('select[name="in1.prty"]', { label: '2 note chord' });
   await page.selectOption('select[name="cv1.src"]', { label: 'Note input #1' });
@@ -342,7 +342,7 @@ test('a user really clicking through the dropdowns', async (t) => {
   const out = await download(page);
   assert.equal(hexGroups(out.bytes), hexGroups(MutantBrainPatch.fromFormValues(values).toSysex()));
   assert.equal((await pageDocument(page)).modified, false, 'saved');
-  assert.equal(await page.title(), 'untitled - Mutant Brain Surgery');
+  assert.equal(await page.title(), 'New Patch - Mutant Brain Surgery');
 });
 
 test('selected-but-disabled CC option is shown but saved as 0, like the original site', async (t) => {
@@ -446,7 +446,7 @@ test('the name field renames the patch; the download is named after it', async (
   if (skip()) return t.skip(skip());
   const page = await openPage(t);
   let expected = PatchDocument.create();
-  for (const [name, fileName] of [['Lead', 'Lead.syx'], ['my/kit: v2', 'my-kit- v2.syx'], ['', 'untitled.syx'], ['bass.syx', 'bass.syx']]) {
+  for (const [name, fileName] of [['Lead', 'Lead.syx'], ['my/kit: v2', 'my-kit- v2.syx'], ['', 'New Patch.syx'], ['bass.syx', 'bass.syx']]) {
     await page.fill('#patch-name', name);
     expected = PatchDocument.rename(expected, name);
     await assertPageShows(page, expected, JSON.stringify(name));
@@ -472,7 +472,7 @@ test('the name reads as text until edited: click or pencil to edit, Enter to fin
   await page.click('#rename');
   assert.equal(await editing(), true);
   assert.notEqual(await boxFill(), 'rgba(0, 0, 0, 0)', 'editor fill while editing');
-  assert.deepEqual(await page.evaluate(() => { const i = document.getElementById('patch-name'); return [i.selectionStart, i.selectionEnd]; }), [0, 'untitled'.length]);
+  assert.deepEqual(await page.evaluate(() => { const i = document.getElementById('patch-name'); return [i.selectionStart, i.selectionEnd]; }), [0, 'New Patch'.length]);
   await page.keyboard.type('Bassline');
   await page.keyboard.press('Enter');
   assert.equal(await editing(), false, 'Enter finishes editing');
@@ -506,7 +506,7 @@ test('the name reads as text until edited: click or pencil to edit, Enter to fin
 test('CV.OCD site: its own branding, and the same patch editing', async (t) => {
   if (skip()) return t.skip(skip());
   const page = await openPage(t, undefined, cvocdUrl);
-  assert.equal(await page.title(), 'untitled - CV.OCD Patch Builder');
+  assert.equal(await page.title(), 'New Patch - CV.OCD Patch Builder');
   assert.equal(await page.textContent('h1'), 'cv.ocd');
   for (const img of ['img.logo', 'img.topbar__logo']) {
     assert.equal(await page.evaluate((s) => document.querySelector(s).naturalWidth > 0, img), true, `${img} loads`);

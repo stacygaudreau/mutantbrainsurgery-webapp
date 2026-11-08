@@ -1,0 +1,51 @@
+<!doctype html>
+<!-- Link preview card (Open Graph / Twitter), 1200x630: the site's plain pixel-grid
+     hero with the cv.ocd wordmark, the subtitle and the unit. Rendered to
+     img/social.png by tools/make-brand-images.mjs. -->
+<html>
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;700&family=Special+Elite&display=block">
+<style>
+  html, body { margin: 0; width: 1200px; height: 630px; overflow: hidden; }
+  body {
+    position: relative;
+    box-sizing: border-box;
+    padding: 40px 56px 0;
+    color: #f1f2ec;
+    text-align: center;
+    background:
+      linear-gradient(180deg, rgba(17, 18, 19, 0) 55%, #111213 100%),
+      linear-gradient(rgba(241, 242, 236, 0.04) 1px, transparent 1px) 0 0 / 8px 8px,
+      linear-gradient(90deg, rgba(241, 242, 236, 0.04) 1px, transparent 1px) 0 0 / 8px 8px,
+      #111213;
+  }
+  .badge { position: absolute; top: 36px; left: 48px; height: 84px; }
+  .tag { position: absolute; top: 66px; right: 52px; font: 500 22px/1 "JetBrains Mono", monospace; letter-spacing: 0.2em; color: #7d827d; }
+  h1 { margin: 34px 0 0; font: 150px/0.9 "Special Elite", "Courier New", monospace; letter-spacing: 0.02em; }
+  .dot { color: #e5483e; }
+  p {
+    margin: 22px 0 0;
+    font: 500 34px/1 "JetBrains Mono", monospace;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: #c9ccc6;
+  }
+  .prompt { color: #c6d64a; }
+  .cursor { display: inline-block; width: 0.6em; height: 1.05em; margin-left: 0.3em; vertical-align: -0.15em; background: #c6d64a; }
+  .unit {
+    display: block;
+    width: 860px; height: auto;
+    margin: 34px auto 0;
+    filter: drop-shadow(0 16px 22px rgba(0, 0, 0, 0.75));
+  }
+</style>
+</head>
+<body>
+  <img class="badge" src="../img/sixty-four-pixels.png" alt="">
+  <span class="tag">MIDI -&gt; CV</span>
+  <h1>cv<span class="dot">.</span>ocd</h1>
+  <p><span class="prompt">&gt;</span> SysEx patch builder<span class="cursor"></span></p>
+  <img class="unit" src="../img/cvocd.png" alt="">
+</body>
+</html>
