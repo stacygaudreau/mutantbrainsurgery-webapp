@@ -1,8 +1,8 @@
 /**
- * Mutant Brain Surgery page. The patch being edited lives in memory as a
- * PatchDocument; the page renders it and turns user actions into library
- * calls (open, new, clear, rename, change a setting, save). All patch logic
- * lives in the library.
+ * The patch builder page (Mutant Brain Surgery, and the CV.OCD site). The
+ * patch being edited lives in memory as a PatchDocument; the page renders it
+ * and turns user actions into library calls (open, new, clear, rename, change
+ * a setting, save). All patch logic lives in the library.
  */
 import { Editor, Form, PatchDocument, type EditorView, type FieldRef, type FieldView, type FormField, type FormSection } from '../lib';
 
@@ -10,6 +10,12 @@ import { Editor, Form, PatchDocument, type EditorView, type FieldRef, type Field
 let doc: PatchDocument = PatchDocument.create();
 /** Editor.view(doc.patch), computed once per change of settings. */
 let view: EditorView = Editor.view(doc.patch);
+
+// Branding comes from the page, so each site (Mutant Brain Surgery, CV.OCD)
+// shares this script: the site name is the page's <title>, and the firmware
+// link is <body data-firmware-url="...">.
+const SITE_TITLE = document.title;
+const FIRMWARE_URL = document.body.getAttribute('data-firmware-url') || Form.FIRMWARE_URL;
 
 const selects = new Map<string, HTMLSelectElement>();
 
@@ -70,10 +76,6 @@ function buildSection(section: FormSection): HTMLElement {
 
   const block = el('section', { className: 'block info-panel', 'aria-label': section.title }, [heading]);
   block.appendChild(el('div', { className: 'scroll' }, [table]));
-  if (section.key === 'inputs') {
-    block.appendChild(el('p', { className: 'hint', textContent: 'Tip: hover a setting name for a description' }));
-  }
-  if (section.firmwareNote) block.appendChild(firmwareNote());
   return block;
 }
 
@@ -112,12 +114,23 @@ function buildSettingsList(section: FormSection): HTMLTableElement {
   return el('table', { className: 'grid grid--settings' }, [body]);
 }
 
-function firmwareNote(): HTMLElement {
-  return el('p', { className: 'note' }, [
-    '† Some settings have specific firmware requirements. Make sure you have an ',
-    el('a', { href: Form.FIRMWARE_URL, textContent: 'appropriate firmware version', target: '_blank', rel: 'noopener' }),
-    ' to use settings marked with the † symbol',
-  ]);
+/**
+ * Notes below the settings, each in its own untitled pane, side by side:
+ * the hover tip (hidden on touch screens, where there is no hover) and the
+ * † firmware note (once, if any section has firmware-dependent settings).
+ */
+function notesRow(): HTMLElement {
+  const pane = (className: string, label: string, text: HTMLElement) =>
+    el('section', { className: `block info-panel info-panel--plain ${className}`, 'aria-label': label }, [text]);
+  const panes = [pane('tip', 'Tip', el('p', { className: 'hint', textContent: 'Tip: hover a setting name for a description' }))];
+  if (Form.SECTIONS.some((section) => section.firmwareNote)) {
+    panes.push(pane('firmware', 'Firmware note', el('p', { className: 'note' }, [
+      '† Some settings have specific firmware requirements. Make sure you have an ',
+      el('a', { href: FIRMWARE_URL, textContent: 'appropriate firmware version', target: '_blank', rel: 'noopener' }),
+      ' to use settings marked with the † symbol',
+    ])));
+  }
+  return el('div', { className: 'pane-row notes' }, panes);
 }
 
 // ---------------------------------------------------------------------------
@@ -132,7 +145,8 @@ function render(): void {
     select.disabled = !f.enabled;
   });
   const nameInput = byId<HTMLInputElement>('patch-name');
-  if (nameInput.value !== doc.name) nameInput.value = doc.name;  document.title = `${doc.modified ? '• ' : ''}${doc.name} - Mutant Brain Surgery`;
+  if (nameInput.value !== doc.name) nameInput.value = doc.name;
+  document.title = `${doc.modified ? '• ' : ''}${doc.name} - ${SITE_TITLE}`;
 }
 
 /** Replace the document and re-render if it changed. */
@@ -264,6 +278,7 @@ for (const section of Form.SECTIONS) {
   const slot = document.getElementById(`slot-${section.key}`) || sectionsRoot;
   slot.appendChild(buildSection(section));
 }
+sectionsRoot.appendChild(notesRow());
 render();
 
 byId('file').addEventListener('change', openChosenFile);

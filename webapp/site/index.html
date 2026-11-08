@@ -3,35 +3,19 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Mutant Brain Surgery</title>
-<meta name="description" content="SysEx Patch Builder for the Hexinverter Mutant Brain Eurorack Module">
-<meta name="theme-color" content="#000000">
+<title>{{title}}</title>
+<meta name="description" content="{{description}}">
+<meta name="theme-color" content="{{themeColor}}">
 <link rel="icon" href="data:,">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&family=Roboto+Mono:wght@400;500&display=swap">
-<link rel="preload" href="fonts/noyh_black-webfont.woff2" as="font" type="font/woff2" crossorigin>
+{{> head}}
 <link rel="stylesheet" href="style.css">
 </head>
-<body>
-<header class="nav-bar">
-  <a class="nav-bar__logo" href="https://www.hexinverter.net/"><img src="img/hexinverter-logo.svg" alt="Hexinverter Électronique"></a>
-</header>
+<body data-firmware-url="{{firmwareUrl}}">
+{{> header}}
 
-<!-- Hero: space background that fades into the page colour where the editor begins -->
 <section class="hero">
   <div class="page__inner hero__inner">
-    <header class="page-heading">
-      <h1 class="page-heading__title">Mutant Brain Surgery</h1>
-      <h2 class="page-heading__subtitle">SysEx Patch Builder for the Mutant Brain Eurorack Module</h2>
-    </header>
-    <!-- any orientation works: the image is scaled to fit -->
-    <figure class="module-shot">
-      <picture>
-        <source srcset="img/mutantbrain-black.webp" type="image/webp">
-        <img class="logo" src="img/mutantbrain-black.png" alt="Mutant Brain module, black front panel">
-      </picture>
-    </figure>
+{{> hero}}
     <noscript><p class="status status--error">This page needs JavaScript enabled.</p></noscript>
   </div>
 </section>
@@ -52,7 +36,7 @@
         <section id="patch-pane" class="block info-panel loader" aria-labelledby="patch-title">
           <h3 id="patch-title" class="info-panel__header">Load Patch</h3>
           <div class="loader__body">
-            <p id="intro-empty">Open a Mutant Brain SysEx file to edit it, or start a new patch from scratch!</p>
+            <p id="intro-empty">Open a {{product}} SysEx file to edit it, or start a new patch from scratch!</p>
             <p id="intro-loaded" hidden><strong>Editing patch</strong>. Download it to save it, or create a new patch to start over.</p>
             <div class="field">
               <label for="patch-name" class="field__label">Patch name</label>
@@ -65,14 +49,14 @@
               </div>
             </div>
             <input type="file" id="file" class="visually-hidden" accept=".syx,application/octet-stream">
-            <label for="file" id="open" class="btn btn--teal btn--icon" role="button" tabindex="0">
+            <label for="file" id="open" class="btn btn--primary btn--icon" role="button" tabindex="0">
               <svg class="icon" aria-hidden="true"><use href="#i-open"/></svg><span>Open</span>
             </label>
             <div class="btn-pair">
-              <button type="button" id="new" class="btn btn--black btn--icon">
+              <button type="button" id="new" class="btn btn--secondary btn--icon">
                 <svg class="icon" aria-hidden="true"><use href="#i-new"/></svg><span>New</span>
               </button>
-              <button type="button" id="reset" class="btn btn--black btn--icon">
+              <button type="button" id="reset" class="btn btn--secondary btn--icon">
                 <svg class="icon" aria-hidden="true"><use href="#i-clear"/></svg><span>Clear</span>
               </button>
             </div>

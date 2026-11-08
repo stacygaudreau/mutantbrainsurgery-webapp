@@ -1,7 +1,8 @@
 'use strict';
 /**
  * Checks on the build output (npm test builds first):
- *  - the website bundle only uses ES2017 syntax, so widely supported browsers run it
+ *  - the website bundles only use ES2017 syntax, so widely supported browsers run them
+ *  - each site (Mutant Brain Surgery, CV.OCD) has its own page and assets
  *  - the ESM and CommonJS library builds expose the same API, with type declarations
  */
 const test = require('node:test');
@@ -53,20 +54,37 @@ test('the syntax checker itself detects newer syntax', () => {
   assert.deepEqual(findPostEs2017Syntax('const f = async () => { for (const x of [1]) await x; }; class B { m() {} }'), []);
 });
 
-test('website bundle (dist/app.js) only uses ES2017 syntax', () => {
-  assert.deepEqual(findPostEs2017Syntax(read('dist/app.js')), []);
+test('website bundle (dist/mutantbrain/app.js) only uses ES2017 syntax', () => {
+  assert.deepEqual(findPostEs2017Syntax(read('dist/mutantbrain/app.js')), []);
 });
 
-test('website bundle is self-contained: one script, plus static assets', () => {
-  const html = read('dist/index.html');
+test('Mutant Brain site (dist/mutantbrain/): one script, plus its static assets', () => {
+  const html = read('dist/mutantbrain/index.html');
   assert.deepEqual([...html.matchAll(/<script src="([^"]+)"/g)].map((m) => m[1]), ['app.js']);
   for (const f of [
     'index.html', 'style.css', 'app.js', 'img/mutantbrain-black.png', 'img/mutantbrain-black.webp',
     'img/hexinverter-logo.svg', 'img/starfield.svg', 'fonts/noyh_black-webfont.woff2',
   ]) {
-    assert.ok(fs.existsSync(path.join(root, 'dist', f)), `dist/${f}`);
+    assert.ok(fs.existsSync(path.join(root, 'dist/mutantbrain', f)), `dist/mutantbrain/${f}`);
   }
-  assert.match(read('dist/app.js'), /^\/\*! Mutant Brain Surgery \| CC BY-NC-SA 4\.0/);
+  assert.match(read('dist/mutantbrain/app.js'), /^\/\*! Mutant Brain Surgery \| CC BY-NC-SA 4\.0/);
+});
+
+test('CV.OCD site (dist/cvocd/): its own page and assets, the same app, no Hexinverter branding', () => {
+  const html = read('dist/cvocd/index.html');
+  assert.deepEqual([...html.matchAll(/<script src="([^"]+)"/g)].map((m) => m[1]), ['app.js']);
+  for (const f of ['index.html', 'style.css', 'app.js', 'img/cvocd.png', 'img/cvocd.webp', 'img/sixty-four-pixels.png']) {
+    assert.ok(fs.existsSync(path.join(root, 'dist/cvocd', f)), `dist/cvocd/${f}`);
+  }
+  assert.equal(read('dist/cvocd/app.js'), read('dist/mutantbrain/app.js'), 'both sites run the same app.js');
+  assert.deepEqual(findPostEs2017Syntax(read('dist/cvocd/app.js')), []);
+  // nothing of the Hexinverter site: no assets, no names in the page or styles
+  for (const f of ['img/hexinverter-logo.svg', 'img/starfield.svg', 'img/mutantbrain-black.png', 'fonts']) {
+    assert.ok(!fs.existsSync(path.join(root, 'dist/cvocd', f)), `no dist/cvocd/${f}`);
+  }
+  for (const file of ['dist/cvocd/index.html', 'dist/cvocd/style.css']) {
+    assert.doesNotMatch(read(file), /hexinverter|mutant ?brain|noyh/i, file);
+  }
 });
 
 test('library builds: ESM and CommonJS export the same API, with type declarations', async () => {

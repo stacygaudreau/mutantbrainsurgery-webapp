@@ -29,7 +29,8 @@
     "pretest:quick": "npm run build",
     "test:quick": "node --test test/patches.test.js test/codec.test.js test/form.test.js test/generated.test.js",
     "fixtures": "npm run build && node tools/generate-fixtures.js",
-    "serve": "npm run build && node tools/serve.js"
+    "serve": "npm run build && node tools/serve.js",
+    "serve:cvocd": "npm run build && node tools/serve.js cvocd 8766"
   },
   "devDependencies": {
     "esbuild": "^0.24.0",

@@ -1,0 +1,7 @@
+{
+  "title": "CV.OCD Patch Builder",
+  "description": "SysEx patch builder for the CV.OCD MIDI to CV interface by Sixty Four Pixels",
+  "themeColor": "#111213",
+  "product": "CV.OCD",
+  "firmwareUrl": "https://github.com/hotchk155/cvocd.a"
+}

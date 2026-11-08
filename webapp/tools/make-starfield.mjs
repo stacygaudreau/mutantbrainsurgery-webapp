@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Generates public/img/starfield.svg: a seamless, tileable field of small
+ * Generates brands/mutantbrain/img/starfield.svg: a seamless, tileable field of small
  * stars for the hero background (deterministic, so re-running gives the same file).
  *   node tools/make-starfield.mjs
  */
@@ -50,6 +50,6 @@ const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" 
   '<defs><radialGradient id="g"><stop offset="0" stop-color="#cfefff" stop-opacity=".55"/><stop offset="1" stop-color="#cfefff" stop-opacity="0"/></radialGradient></defs>' +
   body + '</svg>\n';
 
-const out = join(dirname(fileURLToPath(import.meta.url)), '..', 'public', 'img', 'starfield.svg');
+const out = join(dirname(fileURLToPath(import.meta.url)), '..', 'brands', 'mutantbrain', 'img', 'starfield.svg');
 writeFileSync(out, svg);
 console.log(`wrote ${out} (${svg.length} bytes, ${wrapped.length} stars)`);

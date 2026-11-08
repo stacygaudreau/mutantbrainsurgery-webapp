@@ -1,0 +1,225 @@
+/* CV.OCD Patch Builder - Sixty Four Pixels branding.
+   Plain and dark, monospace throughout (JetBrains Mono), the "cv.ocd"
+   wordmark in a typewriter face like the panel's, accents taken from the
+   unit's LEDs: ACT blue, ST yellow-green, PWR red.
+   Layered over site/base.css (see there for the variables a theme sets). */
+
+:root {
+  --white: #f1f2ec;
+  --light: #c9ccc6;
+  --mid: #7d827d;
+  --dark: #34383a;
+  --panel: #1a1c1e;
+  --page: #111213;
+  --act: #4f7dff;        /* ACT LED: Open, a loaded patch */
+  --act-dark: #2f55c9;   /* white text 5.9:1 */
+  --st: #c6d64a;         /* ST LED: download, focus, links */
+  --pwr: #e5483e;        /* PWR LED: errors */
+  --link: var(--st);
+  --mono: "JetBrains Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+  --type: "Special Elite", "Courier New", monospace;
+  /* settings tables */
+  --row: #191b1d;        /* row band */
+  --cell: #24272a;       /* dropdown fill */
+  --cell-hover: #2e3236;
+  /* used by site/base.css */
+  --body-font: 400 1.5rem/1.5 var(--mono);
+  --focus-ring: 2px;
+  --loaded: var(--act);
+  --field-hover: rgba(241, 242, 236, 0.04);
+  --field-border-width: 1px;
+  --pane-border-width: 1px;
+  --pane-border: var(--dark);
+  --pane-gap: 5rem;
+  --pane-pad-x: 2.2rem;
+  --btn-icon-gap: 1.2rem;
+  --notes-text: var(--light);
+  --notes-font-size: 1.5rem;
+  --notes-border: #2a2d2f;   /* a step darker than the other panes' --dark */
+}
+
+::selection { background: var(--st); color: var(--page); }
+
+/* ---------------------------------------------------------------- top bar */
+.topbar {
+  display: flex; align-items: center; justify-content: space-between;
+  max-width: 128rem; margin: 0 auto;
+  padding: 2rem 3rem;
+}
+.topbar__brand { display: block; line-height: 0; }
+.topbar__logo { display: block; height: 64px; width: auto; }
+.topbar__tag {
+  display: inline-flex; align-items: center; gap: 0.8rem;
+  padding: 0.6rem 0;
+  font: 500 1.3rem/1 var(--mono); letter-spacing: 0.2em;
+  color: var(--mid); text-decoration: none;
+}
+.topbar__icon { width: 1.25em; height: 1.25em; fill: currentColor; flex: none; }
+.topbar__tag:hover { color: var(--st); text-decoration: underline; }
+
+/* ---------------------------------------------------------------- hero */
+/* plain: a faint pixel grid that fades out into the page */
+.hero {
+  border-bottom: 1px solid var(--dark);
+  background:
+    linear-gradient(180deg, rgba(17, 18, 19, 0) 40%, var(--page) 100%),
+    linear-gradient(rgba(241, 242, 236, 0.035) 1px, transparent 1px) 0 0 / 8px 8px,
+    linear-gradient(90deg, rgba(241, 242, 236, 0.035) 1px, transparent 1px) 0 0 / 8px 8px,
+    var(--page);
+}
+
+/* ---------------------------------------------------------------- page */
+.page__inner { max-width: 128rem; margin: 0 auto; padding: 3rem 3rem 2rem; }
+
+.page-heading { margin-bottom: 3rem; }
+.page-heading__title {
+  font: clamp(5.6rem, 10vw, 10rem)/0.9 var(--type);
+  color: var(--white);
+  letter-spacing: 0.02em;
+}
+.page-heading__title .dot { color: var(--pwr); }
+.page-heading__subtitle {
+  margin-top: 1.6rem;
+  font: 500 clamp(1.6rem, 2.2vw, 2rem)/1.2 var(--mono);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--light);
+}
+.page-heading__subtitle .prompt { color: var(--st); }
+/* blinking terminal cursor after the subtitle */
+.page-heading__subtitle::after {
+  content: "";
+  display: inline-block;
+  width: 0.6em; height: 1.05em;
+  margin-left: 0.3em;
+  vertical-align: -0.15em;
+  background: var(--st);
+  animation: blink 1.1s steps(1) infinite;
+}
+@keyframes blink { 50% { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .page-heading__subtitle::after { animation: none; } }
+
+/* ---------------------------------------------------------------- status messages */
+.status {
+  border-left: 4px solid var(--mid);
+  font-size: 1.4rem;
+  line-height: 1.4;
+}
+.status::before {
+  position: absolute; left: 1.4rem; top: 1.2rem;
+  font-weight: 700;
+}
+.status--error { border-left-color: var(--pwr); }
+.status--error::before { content: "[!]"; left: 0.9rem; color: var(--pwr); }
+
+/* ---------------------------------------------------------------- hero: product image */
+/* desktop: 12rem of space above and below the image, and the same above the
+   heading, so the heading sits centred between the top bar and the image.
+   Above the image, its margin collapses with the heading's (3rem); below, it
+   adds to the hero's 2rem padding. */
+@media (min-width: 900px) {
+  .hero__inner { padding-top: 12rem; }
+  .module-shot { margin: 12rem 0 10rem; }
+}
+.logo {
+  max-width: min(100%, 96rem); max-height: 34rem;
+  filter: drop-shadow(0 12px 18px rgba(0, 0, 0, 0.7));
+}
+
+/* ---------------------------------------------------------------- panes */
+/* a plain box with its title set into the top border, terminal-window style */
+.info-panel { background: var(--panel); }
+.info-panel__header {
+  position: absolute; top: 0; left: 2.4rem;
+  transform: translateY(-50%);
+  width: max-content; max-width: calc(100% - 4.8rem);
+  padding: 0.2rem 1.2rem;
+  background: var(--page);
+  border: 1px solid var(--dark);
+  font: 700 1.6rem/1.3 var(--mono);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--white);
+}
+.loader p { font-size: 1.5rem; line-height: 1.6; text-align: left; }
+.loader p strong { color: var(--white); }
+
+.field__label { font: 500 1.2rem/1.2 var(--mono); color: var(--mid); text-transform: uppercase; letter-spacing: 0.14em; }
+.loader--loaded .info-panel__header { border-color: var(--act); color: var(--act); }
+.text-input {
+  padding: 1rem 1.2rem;
+  font: 700 1.8rem/1.2 var(--mono);
+}
+.icon-btn { color: var(--mid); }
+.icon { stroke-linecap: square; stroke-linejoin: miter; }
+.btn.btn--icon .icon { width: 1.15em; height: 1.15em; }
+
+/* ---------------------------------------------------------------- buttons */
+/* flat blocks; hover inverts like a terminal selection */
+.btn {
+  padding: 1.3rem 2.4rem;
+  border: 1px solid var(--dark);
+  background: transparent;
+  font: 700 1.6rem/1.2 var(--mono);
+  letter-spacing: 0.14em;
+  transition: background-color 0.12s, color 0.12s, border-color 0.12s;
+}
+.btn:hover { background: var(--light); border-color: var(--light); color: var(--page); }
+.btn:active { transform: translate(1px, 1px); }
+/* Open: ACT blue */
+.btn--primary { background: var(--act-dark); border-color: var(--act-dark); color: var(--white); }
+.btn--primary:hover { background: var(--act); border-color: var(--act); color: var(--page); }
+/* New, Clear: outlined */
+.btn--secondary { background: transparent; }
+/* Download: ST yellow-green with dark text (11:1) */
+.btn--accent { background: var(--st); border-color: var(--st); color: var(--page); }
+.btn--accent:hover { background: var(--white); border-color: var(--white); color: var(--page); }
+
+/* ---------------------------------------------------------------- settings sections */
+.pane-row { margin: 5rem 0; }
+
+.block .hint { font-size: 1.3rem; }
+
+table.grid { border-spacing: 0 2px; }
+table.grid td { padding: 0.3rem 0.25rem; }
+table.grid thead td {
+  font: 700 1.2rem/1.2 var(--mono);
+  letter-spacing: 0.04em;
+}
+table.grid td.row-label {
+  padding: 0.3rem 1rem 0.3rem 1.2rem;
+  font: 700 1.3rem/1.2 var(--mono);
+}
+/* the label column sits on the pane background (opaque, as it stays put while a wide table scrolls) */
+table.grid td.row-label, table.grid thead td.row-label { background: var(--panel); }
+
+select {
+  border: 1px solid transparent;
+  font: 400 1.2rem/1.2 var(--mono);
+  letter-spacing: -0.02em;
+  transition: background-color 0.12s, border-color 0.12s;
+}
+select:focus { border-color: var(--st); }
+select:disabled { background: transparent; color: #4d5256; cursor: not-allowed; }
+
+.note { font-size: 1.3rem; }
+
+/* ---------------------------------------------------------------- download bar */
+.actions {
+  padding: 2rem 0;
+  background: rgba(17, 18, 19, 0.96);
+}
+.actions .btn { font-size: 1.8rem; padding: 1.6rem 3rem; }
+
+/* ---------------------------------------------------------------- small screens */
+@media (max-width: 899.95px) {
+  .page__inner { padding: 3rem 3rem 2rem; }
+  .hero__inner { padding-bottom: 4rem; }
+  .logo { max-height: 20rem; }
+}
+@media (max-width: 599.95px) {
+  .topbar { padding: 1.6rem 2rem; }
+  .topbar__logo { height: 42px; }
+  .page__inner { padding: 2rem 2rem 2rem; }
+  .hero__inner { padding-top: 3rem; } /* heading centred: same 3rem as below it */
+}

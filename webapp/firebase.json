@@ -1,7 +1,7 @@
 {
   "hosting": {
     "site": "mutantbrainsurgery",
-    "public": "dist",
+    "public": "dist/mutantbrain",
     "predeploy": ["npm run build"],
     "ignore": [
       "firebase.json",

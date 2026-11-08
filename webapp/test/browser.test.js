@@ -26,6 +26,9 @@ try { ({ chromium } = require('playwright-core')); } catch { /* optional dev dep
 let browser = null;
 let server = null;
 let baseUrl = null;
+/** The CV.OCD site (dist/cvocd/): the same app with other branding. */
+let cvocdServer = null;
+let cvocdUrl = null;
 let skipReason = chromium ? null : 'playwright-core not installed (npm install)';
 
 test.before(async () => {
@@ -38,27 +41,31 @@ test.before(async () => {
   server = createServer();
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
   baseUrl = `http://127.0.0.1:${server.address().port}/`;
+  cvocdServer = createServer('cvocd');
+  await new Promise((resolve) => cvocdServer.listen(0, '127.0.0.1', resolve));
+  cvocdUrl = `http://127.0.0.1:${cvocdServer.address().port}/`;
 });
 
 // note: playwright-core < 1.5x leaked a TargetClosedError after downloads in Edge; use >= 1.64
 test.after(async () => {
   if (browser) await browser.close();
   if (server) await new Promise((resolve) => server.close(resolve));
+  if (cvocdServer) await new Promise((resolve) => cvocdServer.close(resolve));
 });
 
 /** Fresh page; fails the test on any console error, page error or failed request. */
-async function openPage(t, viewport) {
+async function openPage(t, viewport, siteUrl = baseUrl) {
   const context = await browser.newContext({ acceptDownloads: true, viewport: viewport || { width: 1280, height: 900 } });
   // hermetic: external resources (Google Fonts) get an empty response, so the
   // tests run offline and fonts fall back to the local stacks
-  await context.route((url) => !url.href.startsWith(baseUrl), (route) => route.fulfill({ status: 200, contentType: 'text/css', body: '' }));
+  await context.route((url) => !url.href.startsWith(siteUrl), (route) => route.fulfill({ status: 200, contentType: 'text/css', body: '' }));
   const page = await context.newPage();
   const problems = [];
   page.on('console', (m) => { if (m.type() === 'error') problems.push(`console: ${m.text()}`); });
   page.on('pageerror', (e) => problems.push(`pageerror: ${e.message}`));
   page.on('requestfailed', (r) => problems.push(`requestfailed: ${r.url()}`));
   page.on('response', (r) => { if (r.status() >= 400) problems.push(`HTTP ${r.status()}: ${r.url()}`); });
-  await page.goto(baseUrl);
+  await page.goto(siteUrl);
   await page.waitForFunction(() => window.MutantBrainApp);
   t.after(async () => {
     await context.close();
@@ -175,7 +182,24 @@ test('renders every field with exactly the library schema', async (t) => {
   assert.equal(headers.length, Form.SECTIONS.reduce((n, s) => n + s.columns.length, 0));
   assert.equal(await page.evaluate(() => document.querySelector('img.logo').naturalWidth > 0), true, 'logo loads');
   const links = await page.evaluate(() => [...document.querySelectorAll('.note a')].map((a) => a.href));
-  assert.deepEqual(links, [Form.FIRMWARE_URL, Form.FIRMWARE_URL], 'firmware note under CV and gate sections');
+  assert.deepEqual(links, [Form.FIRMWARE_URL], 'one firmware note');
+  // the hover tip and the firmware note: untitled panes side by side after the settings,
+  // equal height, the pair centred in the page column; the settings panes have no notes
+  const layout = await page.evaluate(() => {
+    const row = document.querySelector('#sections > .notes');
+    const box = (e) => e.getBoundingClientRect();
+    const column = box(document.querySelector('#sections'));
+    const panes = [...row.children].map((s) => ({ label: s.getAttribute('aria-label'), titled: !!s.querySelector('.info-panel__header'), box: box(s) }));
+    return {
+      last: row === document.querySelector('#sections').lastElementChild,
+      panes: panes.map((p) => [p.label, p.titled]),
+      sameTop: Math.abs(panes[0].box.top - panes[1].box.top) < 1,
+      sameHeight: Math.abs(panes[0].box.height - panes[1].box.height) < 1,
+      centred: Math.abs((panes[0].box.left - column.left) - (column.right - panes[1].box.right)) < 1.5,
+      notesInSettings: document.querySelectorAll('#sections > section .note, #sections > section .hint, .pane-row:not(.notes) .hint').length,
+    };
+  });
+  assert.deepEqual(layout, { last: true, panes: [['Tip', false], ['Firmware note', false]], sameTop: true, sameHeight: true, centred: true, notesInSettings: 0 });
   assert.equal(await page.evaluate(() => getComputedStyle(document.querySelector('button.go')).position), 'static');
   assert.equal(await page.evaluate(() => getComputedStyle(document.querySelector('.actions')).position), 'sticky', 'download bar stays in reach');
   // the patch panel
@@ -370,10 +394,17 @@ test('Open Patch: the button opens the file picker; choosing a file opens it, ag
   await upload(page, ref.name, ref.bytes); // ...then picks the very same file again
   await waitOpened(page, ref.name);
   await assertPageShows(page, expected, 're-opened');
-  // keyboard: the button is focusable and Enter opens the picker
+  // keyboard: the button is focusable, and Enter or Space clicks the file input
+  // (checked on the input itself: Playwright's file-chooser event can miss a
+  // keyboard-opened picker when the machine is busy)
+  await page.evaluate(() => {
+    window.fileInputClicks = 0;
+    document.getElementById('file').addEventListener('click', (e) => { window.fileInputClicks++; e.preventDefault(); });
+  });
   await page.focus('#open');
-  const [again] = await Promise.all([page.waitForEvent('filechooser'), page.keyboard.press('Enter')]);
-  assert.ok(again);
+  await page.keyboard.press('Enter');
+  await page.keyboard.press(' ');
+  assert.equal(await page.evaluate(() => window.fileInputClicks), 2, 'Enter and Space open the picker');
 });
 
 test('New Patch: fresh settings and a new name, ready to type', async (t) => {
@@ -468,9 +499,90 @@ test('the name reads as text until edited: click or pencil to edit, Enter to fin
   assert.equal(downloads, 0);
 });
 
-test('phone width: page itself does not scroll sideways (tables scroll in place)', async (t) => {
+// ---------------------------------------------------------------------------
+// The CV.OCD site: the same app, branded for Sixty Four Pixels
+// ---------------------------------------------------------------------------
+
+test('CV.OCD site: its own branding, and the same patch editing', async (t) => {
   if (skip()) return t.skip(skip());
-  const page = await openPage(t, { width: 375, height: 800 });
-  const { scrollWidth, innerWidth } = await page.evaluate(() => ({ scrollWidth: document.documentElement.scrollWidth, innerWidth: window.innerWidth }));
-  assert.ok(scrollWidth <= innerWidth, `page width ${scrollWidth} > viewport ${innerWidth}`);
+  const page = await openPage(t, undefined, cvocdUrl);
+  assert.equal(await page.title(), 'untitled - CV.OCD Patch Builder');
+  assert.equal(await page.textContent('h1'), 'cv.ocd');
+  for (const img of ['img.logo', 'img.topbar__logo']) {
+    assert.equal(await page.evaluate((s) => document.querySelector(s).naturalWidth > 0, img), true, `${img} loads`);
+  }
+  assert.equal(await page.getAttribute('img.topbar__logo', 'alt'), 'Sixty Four Pixels');
+  assert.doesNotMatch(await page.evaluate(() => document.body.innerText), /hexinverter|mutant brain/i);
+  // the firmware note links to the CV.OCD firmware
+  const links = await page.evaluate(() => [...document.querySelectorAll('.note a')].map((a) => a.href));
+  assert.deepEqual(links, ['https://github.com/hotchk155/cvocd.a']);
+  // every field is there, and opening / editing / downloading works as on the other site
+  assert.equal(await page.locator('#sysex select').count(), Form.FIELDS.length);
+  const ref = referencePatches()[0];
+  await upload(page, ref.name, ref.bytes);
+  await waitOpened(page, ref.name);
+  await assertPageShows(page, PatchDocument.open(ref.name, ref.bytes), 'opened');
+  await page.selectOption('select[name="global.chan"]', '7');
+  const expected = PatchDocument.set(PatchDocument.open(ref.name, ref.bytes), { section: 'globals', control: 'channel' }, 7);
+  await assertPageShows(page, expected, 'edited');
+  const out = await download(page);
+  assert.equal(out.fileName, ref.name);
+  assert.equal(hexGroups(out.bytes), hexGroups(PatchDocument.toSysex(expected)));
+});
+
+test('both brands: keyboard focus on a dropdown shows the focus ring', async (t) => {
+  if (skip()) return t.skip(skip());
+  // the theme's `select:focus` (border colour) must not cancel the shared focus-visible outline
+  for (const [brand, url] of [['mutantbrain', baseUrl], ['cvocd', cvocdUrl]]) {
+    const page = await openPage(t, undefined, url);
+    const outline = () => page.evaluate(() => {
+      const s = getComputedStyle(document.activeElement);
+      return { name: document.activeElement.name, style: s.outlineStyle, width: s.outlineWidth };
+    });
+    await page.click('select[name="global.chan"]');
+    await page.keyboard.press('Escape');
+    await page.keyboard.press('Tab'); // to the next dropdown, by keyboard
+    const ring = await outline();
+    assert.equal(ring.name, 'global.dur', `${brand}: Tab moved to the next setting`);
+    assert.deepEqual([ring.style, ring.width], ['solid', '2px'], `${brand}: keyboard focus ring`);
+  }
+});
+
+test('both brands: the download bar stays on the bottom edge, also at the end of the page', async (t) => {
+  if (skip()) return t.skip(skip());
+  for (const [brand, url] of [['mutantbrain', baseUrl], ['cvocd', cvocdUrl]]) {
+    for (const width of [1280, 375]) {
+      const page = await openPage(t, { width, height: 800 }, url);
+      const gapBelowBar = (where) => page.evaluate((w) => {
+        window.scrollTo(0, w === 'end' ? document.documentElement.scrollHeight : document.documentElement.scrollHeight / 2);
+        return window.innerHeight - document.querySelector('.actions').getBoundingClientRect().bottom;
+      }, where);
+      assert.ok(Math.abs(await gapBelowBar('middle')) < 0.5, `${brand} ${width}px: on the bottom edge mid-page`);
+      // at the end it rests at its place in the page: nothing below it (≤1px of sub-pixel rounding)
+      const end = await gapBelowBar('end');
+      assert.ok(end >= -0.5 && end <= 1, `${brand} ${width}px: ${end}px below the bar at the end of the page`);
+    }
+  }
+});
+
+test('both brands, phone widths down to 280px: the page never scrolls sideways (tables scroll in place)', async (t) => {
+  if (skip()) return t.skip(skip());
+  // 280 = Galaxy Fold, 320 = iPhone SE (1st gen), 360 = small Android, 375/390/414 = common iPhones
+  for (const [brand, url] of [['mutantbrain', baseUrl], ['cvocd', cvocdUrl]]) {
+    const page = await openPage(t, { width: 414, height: 800 }, url);
+    for (const width of [280, 300, 320, 340, 360, 375, 390, 414]) {
+      await page.setViewportSize({ width, height: 800 });
+      const r = await page.evaluate(() => {
+        const vw = document.documentElement.clientWidth;
+        const sticking = [...document.querySelectorAll('body *')]
+          .filter((e) => !e.closest('.scroll') && e.getBoundingClientRect().width > 0 && e.getBoundingClientRect().right > vw + 0.5)
+          .map((e) => `${e.tagName.toLowerCase()}${e.id ? '#' + e.id : ''}`);
+        return { scrollWidth: document.documentElement.scrollWidth, vw, sticking: sticking.slice(0, 5) };
+      });
+      assert.ok(r.scrollWidth <= r.vw, `${brand} at ${width}px: page is ${r.scrollWidth}px wide (${r.sticking.join(', ')})`);
+      // New and Clear: equal widths, each inside the pane
+      const [a, b] = await page.evaluate(() => ['#new', '#reset'].map((s) => document.querySelector(s).getBoundingClientRect().width));
+      assert.ok(Math.abs(a - b) < 1, `${brand} at ${width}px: New and Clear are the same width (${a} vs ${b})`);
+    }
+  }
 });

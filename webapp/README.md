@@ -11,7 +11,8 @@ UI can reuse it as-is. The Mutant Brain Surgery web page (`src/app`) is built on
 | `src/lib/` | Library source (`index.ts` is the public API) |
 | `src/app/` | Web page script |
 | `build/lib/` | Built library: `index.mjs` (ESM), `index.cjs` (CommonJS), `types/*.d.ts` |
-| `dist/` | Built website (`public/` + bundled `app.js`, compiled to ES2017) |
+| `site/`, `brands/` | The websites: shared page and styles, and one folder per brand (see below) |
+| `dist/<brand>/` | Built website of each brand (with the bundled `app.js`, compiled to ES2017) |
 
 | `src/lib/` file | Purpose |
 |---|---|
@@ -24,6 +25,30 @@ UI can reuse it as-is. The Mutant Brain Surgery web page (`src/app`) is built on
 | `form/display.ts`, `rules.ts`, `submit.ts` | Patch to form, enabled fields, form to patch |
 | `MutantBrainPatch.ts` | The main class |
 | `editor/` | `Editor`: typed, immutable API for building UIs (e.g. React) |
+
+## Deploy (any static host)
+
+The website is plain static files with no server code. Pick a brand, build it,
+and publish the folder:
+
+```
+npm ci
+npm run build -- --brand mutantbrain   # -> dist/mutantbrain/
+npm run build -- --brand cvocd         # -> dist/cvocd/
+```
+
+| Brand | Site |
+| --- | --- |
+| `mutantbrain` | Mutant Brain Surgery (Hexinverter) |
+| `cvocd` | CV.OCD Patch Builder (Sixty Four Pixels) |
+
+- **Upload it yourself:** copy the contents of `dist/<brand>/` to any web host.
+- **Host builds from the repo** (Netlify, Cloudflare Pages, Vercel, ...): base
+  directory `webapp`, build command `npm ci && npm run build -- --brand <brand>`,
+  publish directory `dist/<brand>`.
+- The `BRAND=<brand>` environment variable works instead of `--brand`, and
+  `--out <folder>` builds into another folder (empty, or a previous build).
+- Firebase is already set up for `mutantbrain`: `firebase deploy` from `webapp/`.
 
 ## Using it in another project
 
@@ -205,10 +230,36 @@ download name), `DEFAULT_PATCH_NAME`, `PATCH_FILE_EXTENSION`.
 
 ```
 npm install
-npm run build        # type-check, then build dist/ (website) and build/lib/ (library)
+npm run build        # type-check, then build every website and build/lib/ (library)
 npm test             # builds, then runs all test suites
-firebase deploy      # from webapp/: builds, then publishes dist/ to Firebase Hosting
+npm run serve        # preview Mutant Brain Surgery at http://127.0.0.1:8765/
+npm run serve:cvocd  # preview the CV.OCD site at http://127.0.0.1:8766/
 ```
+
+### Brands: one app, several websites
+
+Each website is the same app (`app.js`, built from `src/app`) under a different
+brand. The page and the layout are shared; a brand supplies only what differs.
+
+| Path | Contents |
+| --- | --- |
+| `site/index.html` | The page, with slots: `{{title}}`, `{{description}}`, `{{themeColor}}`, `{{product}}`, `{{firmwareUrl}}` from `brand.json`; `{{> head}}`, `{{> header}}`, `{{> hero}}` from the brand's `.html` files |
+| `site/base.css` | Shared layout and components, driven by CSS variables (listed at its top) |
+| `brands/<name>/brand.json` | Title, description, theme colour, product name, firmware link |
+| `brands/<name>/head.html`, `header.html`, `hero.html` | Fonts, top bar, heading and product image |
+| `brands/<name>/theme.css` | The variables, plus colours, fonts and decoration; goes after `base.css` |
+| `brands/<name>/img/`, `fonts/` | Assets, published as they are |
+
+| Brand | Site |
+| --- | --- |
+| `mutantbrain` | Mutant Brain Surgery (Hexinverter), the default |
+| `cvocd` | CV.OCD Patch Builder (Sixty Four Pixels) |
+
+To add a brand, copy a brand folder and change it; `npm test` checks that the
+folder is complete and that its theme sets every variable `base.css` uses.
+
+Without `--brand`, `npm run build` builds every brand, each to `dist/<brand>/`
+(see [Deploy](#deploy-any-static-host)).
 
 The library is checked against the ES2017 standard library with no DOM types, and
 the website bundle is compiled to ES2017 (Chrome/Edge 79+, Firefox 60+, Safari 12+).
