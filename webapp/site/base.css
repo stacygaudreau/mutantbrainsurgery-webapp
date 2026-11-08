@@ -238,5 +238,6 @@ select option { background: var(--panel); color: var(--white); }
   .block.info-panel.info-panel--plain { padding: 2rem 1.4rem; }
   .actions .btn { max-width: none; }
 }
-/* touch screens have no hover: no hover tip (its whole pane) */
-@media (hover: none) { .block .hint, .info-panel.tip { display: none; } }
+/* touch screens have no hover: no hover tip (its whole pane). The pane selector
+   must outrank `.pane-row .block.info-panel { display: flex }` above. */
+@media (hover: none) { .block .hint, .pane-row .block.info-panel.tip { display: none; } }

@@ -548,6 +548,29 @@ test('both brands: keyboard focus on a dropdown shows the focus ring', async (t)
   }
 });
 
+test('both brands: on a touch phone the hover tip pane is hidden; with a mouse it shows', async (t) => {
+  if (skip()) return t.skip(skip());
+  const { devices } = require('playwright-core');
+  for (const [brand, url] of [['mutantbrain', baseUrl], ['cvocd', cvocdUrl]]) {
+    for (const [name, options, shown] of [['Pixel 5', devices['Pixel 5'], false], ['iPhone 13', devices['iPhone 13'], false], ['desktop', { viewport: { width: 1280, height: 800 } }, true]]) {
+      const context = await browser.newContext(options);
+      t.after(() => context.close());
+      await context.route((u) => !u.href.startsWith(url), (route) => route.fulfill({ status: 200, contentType: 'text/css', body: '' }));
+      const page = await context.newPage();
+      await page.goto(url);
+      await page.waitForFunction(() => document.querySelector('.notes'));
+      const r = await page.evaluate(() => ({
+        touch: matchMedia('(hover: none)').matches,
+        tip: document.querySelector('.info-panel.tip').getBoundingClientRect().height > 0,
+        firmware: document.querySelector('.info-panel.firmware').getBoundingClientRect().height > 0,
+      }));
+      assert.equal(r.touch, !shown, `${brand} ${name}: emulated as ${shown ? 'mouse' : 'touch'}`);
+      assert.equal(r.tip, shown, `${brand} ${name}: tip pane ${shown ? 'shown' : 'hidden'}`);
+      assert.equal(r.firmware, true, `${brand} ${name}: firmware note always shown`);
+    }
+  }
+});
+
 test('both brands: the download bar stays on the bottom edge, also at the end of the page', async (t) => {
   if (skip()) return t.skip(skip());
   for (const [brand, url] of [['mutantbrain', baseUrl], ['cvocd', cvocdUrl]]) {
