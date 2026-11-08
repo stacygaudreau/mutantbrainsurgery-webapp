@@ -7,10 +7,6 @@ https://creativecommons.org/licenses/by-nc-sa/4.0/legalcode
 It is based on CV.OCD by Jason Hotchkiss (https://github.com/hotchk155/cvocd.a),
 used with permission and licensed under the same terms (CC BY-NC-SA 4.0).
 
-Changes from the original: the Classic ASP/VBScript patch builder was ported to a
-static web page and a reusable TypeScript SysEx codec library (webapp/src/lib),
-restyled, and given tests and tooling. The SysEx output is unchanged.
-
 The full license text follows.
 
 Attribution-NonCommercial-ShareAlike 4.0 International
