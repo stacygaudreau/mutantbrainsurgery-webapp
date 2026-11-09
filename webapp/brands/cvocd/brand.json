@@ -9,5 +9,7 @@
   "url": "https://cvocd.web.app",
   "socialImageAlt": "cv.ocd SysEx patch builder, above the CV.OCD MIDI to CV interface",
   "author": "Sixty Four Pixels",
-  "authorUrl": "https://www.tindie.com/products/hotchk155/cvocd-a-super-flexible-midi-to-cv-box/"
+  "authorUrl": "https://www.tindie.com/products/hotchk155/cvocd-a-super-flexible-midi-to-cv-box/",
+  "supportUrl": "https://github.com/stacygaudreau/mutantbrainsurgery-webapp/issues",
+  "supportLabel": "Open an issue on GitHub"
 }

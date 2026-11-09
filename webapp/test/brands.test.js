@@ -41,7 +41,7 @@ test('every brand folder is complete, with a valid brand.json', async () => {
       assert.ok(fs.existsSync(path.join(root, 'brands', brand, f)), `brands/${brand}/${f}`);
     }
     const config = brandConfig(brand);
-    assert.deepEqual(Object.keys(config).sort(), ['author', 'authorUrl', 'description', 'firmwareUrl', 'pageTitle', 'product', 'shortName', 'socialImageAlt', 'themeColor', 'title', 'url']);
+    assert.deepEqual(Object.keys(config).sort(), ['author', 'authorUrl', 'description', 'firmwareUrl', 'pageTitle', 'product', 'shortName', 'socialImageAlt', 'supportLabel', 'supportUrl', 'themeColor', 'title', 'url']);
     assert.ok([...config.shortName].length <= 12, `${brand}: shortName fits a home screen`);
     assert.match(config.firmwareUrl, /^https:\/\//);
     assert.match(config.url, /^https:\/\/[^/]+$/, `${brand}: url is https, no trailing slash`);
@@ -59,7 +59,8 @@ test('each brand page: slots filled in, every element the app needs, brand value
     assert.doesNotMatch(html, /\{\{|\}\}/, `${brand}: no unfilled slots`);
     for (const id of ids) assert.match(html, new RegExp(`id="${id}"`), `${brand}: #${id}`);
     assert.ok(html.includes(`<title>${config.pageTitle}</title>`), `${brand}: title`);
-    assert.ok(html.includes(`<body data-firmware-url="${config.firmwareUrl}">`), `${brand}: firmware link`);
+    assert.ok(html.includes(`data-firmware-url="${config.firmwareUrl}"`), `${brand}: firmware link`);
+    assert.ok(html.includes(`data-support-url="${config.supportUrl}" data-support-label="${config.supportLabel}"`), `${brand}: bug report link`);
     assert.ok(html.includes(`Open a ${config.product} SysEx file`), `${brand}: product name in the intro`);
     assert.ok(html.includes(read('brands', brand, 'hero.html').trimEnd()), `${brand}: hero partial`);
     assert.ok(html.includes(read('brands', brand, 'header.html').trimEnd()), `${brand}: header partial`);
@@ -170,6 +171,10 @@ test('site metadata: titles, robots.txt, sitemap, web app manifest and structure
     assert.equal(ld['@type'], 'WebApplication');
     assert.equal(ld.url, `${config.url}/`);
     assert.equal(ld.author.name, config.author);
+    // static host rules (Cloudflare, Netlify): headers for every site, and the old .asp redirects for Mutant Brain
+    assert.equal(dist('_headers'), read('site', '_headers'), `${brand}: _headers`);
+    assert.match(dist('_headers'), /^\/\*\n  X-Content-Type-Options: nosniff$/m);
+    if (brand === 'mutantbrain') assert.match(dist('_redirects'), /^\/patch\.asp\s+\/\s+301$/m);
     // all of them follow --url
     const other = { url: 'https://patches.example.com' };
     assert.match(renderRobots(brand, other), /Sitemap: https:\/\/patches\.example\.com\/sitemap\.xml/);

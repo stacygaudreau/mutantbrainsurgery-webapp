@@ -28,12 +28,20 @@
 {{> head}}
 <link rel="stylesheet" href="style.css">
 </head>
-<body data-firmware-url="{{firmwareUrl}}">
+<body data-firmware-url="{{firmwareUrl}}" data-support-url="{{supportUrl}}" data-support-label="{{supportLabel}}">
 {{> header}}
 
 <section class="hero">
   <div class="page__inner hero__inner">
 {{> hero}}
+    <!-- launch notice: the page script shows it until data-expires (YYYY-MM-DD) -->
+    <aside class="notice info-panel" aria-labelledby="notice-title" data-expires="2027-08-08" hidden>
+      <h3 id="notice-title" class="info-panel__header">New Web App!</h3>
+      <button type="button" class="notice__close icon-btn" title="Dismiss" aria-label="Dismiss this notice">
+        <svg class="icon" aria-hidden="true"><use href="#i-clear"/></svg>
+      </button>
+      <p>Welcome to the new {{product}} configuration page! Please report any bugs or issues you encounter, on the <a href="{{supportUrl}}" target="_blank" rel="noopener">Issue tracking dashboard here</a>.</p>
+    </aside>
     <noscript><p class="status status--error">This page needs JavaScript enabled.</p></noscript>
   </div>
 </section>

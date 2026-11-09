@@ -314,3 +314,60 @@ test('documents are never mutated', () => {
   assert.throws(() => { 'use strict'; doc.modified = true; }, TypeError);
   assert.throws(() => { 'use strict'; doc.patch.gates[0].minNote = 1; }, TypeError);
 });
+
+test('serialize / deserialize: the whole document comes back, as it was', () => {
+  const r = rng(0x5e71a1);
+  const patches = referencePatches();
+  for (let i = 0; i < 120; i++) {
+    let doc = i % 3 === 0 && patches.length ? PatchDocument.open(r.pick(patches).name, r.pick(patches).bytes) : PatchDocument.create(`patch ${i}`);
+    doc = pick(doc, randomUserValues(r));
+    // values in settings that are switched off survive too (a .syx would save them as 0)
+    doc = PatchDocument.set(doc, { section: 'inputs', index: 3, control: 'minNote' }, r.int(0, 127));
+    if (r.chance(0.3)) doc = PatchDocument.save(doc).document;
+    if (r.chance(0.3)) doc = PatchDocument.rename(doc, `name "with" <odd> characters ✓ ${i}`);
+    const text = PatchDocument.serialize(doc);
+    assert.equal(typeof text, 'string');
+    const back = PatchDocument.deserialize(text);
+    assertDocument(back);
+    assert.equal(back.name, doc.name, `doc ${i} name`);
+    assert.equal(back.modified, doc.modified, `doc ${i} modified`);
+    assert.deepEqual(back.patch, doc.patch, `doc ${i} settings`);
+    assert.equal(hexGroups(PatchDocument.toSysex(back)), hexGroups(PatchDocument.toSysex(doc)), `doc ${i} bytes`);
+  }
+  const saved = JSON.parse(PatchDocument.serialize(PatchDocument.create()));
+  assert.deepEqual(Object.keys(saved), ['format', 'version', 'name', 'modified', 'patch']);
+  assert.equal(saved.format, 'mutantbrain-patch-document');
+  assert.equal(saved.version, 1);
+});
+
+test('deserialize: anything but a saved document is rejected (BAD_DOCUMENT)', () => {
+  const good = JSON.parse(PatchDocument.serialize(PatchDocument.create()));
+  const variant = (change) => { const d = JSON.parse(JSON.stringify(good)); change(d); return JSON.stringify(d); };
+  const bad = [
+    'not json',
+    '',
+    'null',
+    '42',
+    '[]',
+    variant((d) => { d.format = 'something-else'; }),
+    variant((d) => { delete d.format; }),
+    variant((d) => { d.version = 2; }),
+    variant((d) => { d.name = 5; }),
+    variant((d) => { d.modified = 'yes'; }),
+    variant((d) => { delete d.patch; }),
+    variant((d) => { d.patch = 'patch'; }),
+    variant((d) => { d.patch.gates.pop(); }),
+    variant((d) => { d.patch.inputs.push(d.patch.inputs[0]); }),
+    variant((d) => { delete d.patch.globals; }),
+    variant((d) => { d.patch.globals.extra = 1; }),
+    variant((d) => { delete d.patch.cvOutputs[2].volts; }),
+    variant((d) => { d.patch.gates[3].minNote = 128; }),
+    variant((d) => { d.patch.gates[3].minNote = -1; }),
+    variant((d) => { d.patch.gates[3].minNote = 1.5; }),
+    variant((d) => { d.patch.gates[3].minNote = '36'; }),
+    variant((d) => { d.patch.gates[3] = null; }),
+  ];
+  for (const text of bad) throwsCode(() => PatchDocument.deserialize(text), 'BAD_DOCUMENT');
+  // the good one still works
+  assert.equal(PatchDocument.deserialize(JSON.stringify(good)).name, DEFAULT_PATCH_NAME);
+});

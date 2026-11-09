@@ -7,7 +7,8 @@
  *     brand.json      { title (site name), pageTitle (for search results),
  *                       shortName (home screen, max 12 chars), description,
  *                       themeColor, product, firmwareUrl, url (public address),
- *                       socialImageAlt, author, authorUrl }
+ *                       socialImageAlt, author, authorUrl,
+ *                       supportUrl, supportLabel (the "Found a bug?" link) }
  *     head.html       extra <head> tags (icons, fonts) -> {{> head}}
  *     header.html     the top bar                      -> {{> header}}
  *     hero.html       heading and product image        -> {{> hero}}
@@ -18,7 +19,8 @@
  *                     rendered by tools/make-brand-images.mjs)
  *
  * A brand's site is built to dist/<name>/: index.html, style.css (base.css +
- * theme.css), robots.txt, sitemap.xml, site.webmanifest and the assets;
+ * theme.css), robots.txt, sitemap.xml, site.webmanifest, _headers (site/_headers)
+ * and the assets (a brand may add a _redirects file);
  * tools/build.mjs adds app.js. Adding a brand is adding a folder.
  */
 import { createHash } from 'node:crypto';
@@ -36,7 +38,7 @@ export const DEFAULT_BRAND = 'mutantbrain';
 
 const CONFIG_KEYS = [
   'title', 'pageTitle', 'shortName', 'description', 'themeColor', 'product', 'firmwareUrl',
-  'url', 'socialImageAlt', 'author', 'authorUrl',
+  'url', 'socialImageAlt', 'author', 'authorUrl', 'supportUrl', 'supportLabel',
 ];
 /** Computed values put into the page as they are (not HTML-escaped). */
 const RAW_VALUES = new Set(['jsonLd']);
@@ -68,14 +70,15 @@ export function brandConfig(name) {
   if (unknown.length) throw new Error(`${file}: unknown key(s) ${unknown.join(', ')}`);
   config.url = checkSiteUrl(config.url, `${file}: "url"`);
   checkSiteUrl(config.authorUrl, `${file}: "authorUrl"`);
+  checkSiteUrl(config.supportUrl, `${file}: "supportUrl"`);
   if ([...config.shortName].length > 12) throw new Error(`${file}: "shortName" is over 12 characters (home screens cut it off)`);
   return config;
 }
 
 /**
  * The page for a brand: site/index.html with {{value}} (HTML-escaped) and
- * {{> partial}} filled in. `url` replaces brand.json's public address (a site
- * deployed somewhere else).
+ * {{> partial}} filled in; partials may use {{value}} too (but not partials).
+ * `url` replaces brand.json's public address (a site deployed somewhere else).
  */
 export function renderPage(name, { url } = {}) {
   const config = siteConfig(name, url);
@@ -87,14 +90,20 @@ export function renderPage(name, { url } = {}) {
     // JSON in a <script>: "<" escaped so the text can never close the element
     jsonLd: JSON.stringify(structuredData(config)).replace(/</g, '\\u003c'),
   };
+  const slot = /\{\{\s*(>\s*)?([\w-]+)\s*\}\}/g;
+  const fillValues = (text, where) => text.replace(slot, (match, partial, key) => {
+    if (partial) throw new Error(`${where}: partials can't include partials ({{> ${key}}})`);
+    if (!(key in values)) throw new Error(`${where}: unknown value {{${key}}}`);
+    return RAW_VALUES.has(key) ? values[key] : escapeHtml(values[key]);
+  });
   const template = readFileSync(join(SITE_DIR, 'index.html'), 'utf8');
-  const html = template.replace(/\{\{\s*(>\s*)?([\w-]+)\s*\}\}/g, (match, partial, key) => {
+  const html = template.replace(slot, (match, partial, key) => {
     if (partial) {
       if (!PARTIALS.includes(key)) throw new Error(`site/index.html: unknown partial {{> ${key}}}`);
-      return readFileSync(join(BRANDS_DIR, name, `${key}.html`), 'utf8').replace(/\s+$/, '');
+      const text = readFileSync(join(BRANDS_DIR, name, `${key}.html`), 'utf8').replace(/\s+$/, '');
+      return fillValues(text, `brands/${name}/${key}.html`);
     }
-    if (!(key in values)) throw new Error(`site/index.html: unknown value {{${key}}}`);
-    return RAW_VALUES.has(key) ? values[key] : escapeHtml(values[key]);
+    return fillValues(match, 'site/index.html');
   });
   if (/\{\{|\}\}/.test(html)) throw new Error(`brand ${name}: page still has {{ }} after filling in`);
   return html;
@@ -180,6 +189,7 @@ export function buildBrandSite(name, out = join(DIST_DIR, name), { url } = {}) {
   for (const entry of readdirSync(join(BRANDS_DIR, name))) {
     if (!SOURCE_FILES.has(entry)) cpSync(join(BRANDS_DIR, name, entry), join(out, entry), { recursive: true });
   }
+  cpSync(join(SITE_DIR, '_headers'), join(out, '_headers')); // response headers for hosts that read them
   writeFileSync(join(out, 'index.html'), renderPage(name, { url }));
   writeFileSync(join(out, 'robots.txt'), renderRobots(name, { url }));
   writeFileSync(join(out, 'sitemap.xml'), renderSitemap(name, { url }));

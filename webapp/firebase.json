@@ -6,6 +6,8 @@
       "predeploy": ["npm run build"],
       "ignore": [
         "firebase.json",
+        "_headers",
+        "_redirects",
         "**/.*",
         "**/node_modules/**"
       ],
@@ -47,6 +49,8 @@
       "predeploy": ["npm run build"],
       "ignore": [
         "firebase.json",
+        "_headers",
+        "_redirects",
         "**/.*",
         "**/node_modules/**"
       ],

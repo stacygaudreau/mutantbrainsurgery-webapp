@@ -13,11 +13,13 @@ let view: EditorView = Editor.view(doc.patch);
 
 // Branding comes from the page, so each site (Mutant Brain Surgery, CV.OCD)
 // shares this script: the site name is <meta name="application-name"> (the
-// <title> is a longer one for search results), and the firmware link is
-// <body data-firmware-url="...">.
+// <title> is a longer one for search results), and the firmware and bug
+// report links are <body data-firmware-url data-support-url data-support-label>.
 const SITE_TITLE =
   document.querySelector('meta[name="application-name"]')?.getAttribute('content') || document.title;
 const FIRMWARE_URL = document.body.getAttribute('data-firmware-url') || Form.FIRMWARE_URL;
+const SUPPORT_URL = document.body.getAttribute('data-support-url');
+const SUPPORT_LABEL = document.body.getAttribute('data-support-label') || 'Let us know';
 
 const selects = new Map<string, HTMLSelectElement>();
 
@@ -117,22 +119,24 @@ function buildSettingsList(section: FormSection): HTMLTableElement {
 }
 
 /**
- * Notes below the settings, each in its own untitled pane, side by side:
- * the hover tip (hidden on touch screens, where there is no hover) and the
- * † firmware note (once, if any section has firmware-dependent settings).
+ * Notes below the settings, as a bulleted list: where to report a bug (if the
+ * page names a place), the hover tip (hidden on touch screens, where there is
+ * no hover) and the † firmware note (if any section has firmware-dependent
+ * settings).
  */
-function notesRow(): HTMLElement {
-  const pane = (className: string, label: string, text: HTMLElement) =>
-    el('section', { className: `block info-panel info-panel--plain ${className}`, 'aria-label': label }, [text]);
-  const panes = [pane('tip', 'Tip', el('p', { className: 'hint', textContent: 'Tip: hover a setting name for a description' }))];
+function notesFooter(): HTMLElement {
+  const link = (href: string, text: string) => el('a', { href, textContent: text, target: '_blank', rel: 'noopener' });
+  const items: HTMLElement[] = [];
+  if (SUPPORT_URL) items.push(el('li', { className: 'support' }, ['Found a bug? ', link(SUPPORT_URL, SUPPORT_LABEL)]));
+  items.push(el('li', { className: 'tip', textContent: 'Tip: hover a setting name for a description' }));
   if (Form.SECTIONS.some((section) => section.firmwareNote)) {
-    panes.push(pane('firmware', 'Firmware note', el('p', { className: 'note' }, [
+    items.push(el('li', { className: 'firmware' }, [
       '† Some settings have specific firmware requirements. Make sure you have an ',
-      el('a', { href: FIRMWARE_URL, textContent: 'appropriate firmware version', target: '_blank', rel: 'noopener' }),
+      link(FIRMWARE_URL, 'appropriate firmware version'),
       ' to use settings marked with the † symbol',
-    ])));
+    ]));
   }
-  return el('div', { className: 'pane-row notes' }, panes);
+  return el('footer', { className: 'notes', 'aria-label': 'Notes' }, [el('ul', { className: 'notes__list' }, items)]);
 }
 
 // ---------------------------------------------------------------------------
@@ -157,6 +161,36 @@ function update(next: PatchDocument): void {
   if (next.patch !== doc.patch) view = Editor.view(next.patch);
   doc = next;
   render();
+  remember();
+}
+
+// ---------------------------------------------------------------------------
+// Keeping the patch across visits: after every change the open patch (and
+// whether it came from a file) is saved in this browser's storage, and restored
+// when the page opens again. Without storage (e.g. blocked) the page just
+// starts with a new patch, as before.
+// ---------------------------------------------------------------------------
+
+const STORAGE_KEY = 'mutantbrain-surgery:open-patch';
+let fromFile = false;
+
+function remember(): void {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ document: PatchDocument.serialize(doc), fromFile }));
+  } catch { /* storage unavailable or full: keep working without it */ }
+}
+
+/** The patch saved by the last visit, or null (none, or unreadable: then it's dropped). */
+function recall(): { document: PatchDocument; fromFile: boolean } | null {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (!saved) return null;
+    const data = JSON.parse(saved);
+    return { document: PatchDocument.deserialize(data.document), fromFile: data.fromFile === true };
+  } catch {
+    try { localStorage.removeItem(STORAGE_KEY); } catch { /* ignore */ }
+    return null;
+  }
 }
 
 function showError(message: string | null): void {
@@ -169,6 +203,8 @@ function showError(message: string | null): void {
  * box, or "Load patch" for a new one. Clear All keeps it, New Patch ends it.
  */
 function showLoaded(loaded: boolean): void {
+  fromFile = loaded;
+  remember();
   byId('patch-pane').classList.toggle('loader--loaded', loaded);
   byId('patch-title').textContent = loaded ? 'Patch Loaded' : 'Load Patch';
   byId('intro-empty').hidden = loaded;
@@ -271,16 +307,47 @@ function savePatch(event: Event): void {
   }
 }
 
+/**
+ * Time-limited notices: an element with data-expires="YYYY-MM-DD" starts out
+ * hidden, and is shown only before that date (so it never flashes up after),
+ * unless the visitor dismissed it with its .notice__close button. A dismissal
+ * is remembered in this browser for that notice (keyed by its expiry date).
+ */
+const dismissedKey = (notice: HTMLElement) => `notice-dismissed:${notice.dataset.expires}`;
+
+function isDismissed(notice: HTMLElement): boolean {
+  try { return localStorage.getItem(dismissedKey(notice)) === '1'; } catch { return false; }
+}
+
+function showCurrentNotices(now = new Date()): void {
+  document.querySelectorAll<HTMLElement>('[data-expires]').forEach((notice) => {
+    const expires = new Date(`${notice.dataset.expires}T00:00:00`); // midnight, local time
+    notice.hidden = !(now < expires) || isDismissed(notice); // an unreadable date hides it too
+    notice.querySelector('.notice__close')?.addEventListener('click', () => {
+      notice.hidden = true;
+      try { localStorage.setItem(dismissedKey(notice), '1'); } catch { /* private mode: just this visit */ }
+    });
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Start up
 // ---------------------------------------------------------------------------
 
+showCurrentNotices();
 const sectionsRoot = byId('sections');
 for (const section of Form.SECTIONS) {
   const slot = document.getElementById(`slot-${section.key}`) || sectionsRoot;
   slot.appendChild(buildSection(section));
 }
-sectionsRoot.appendChild(notesRow());
+sectionsRoot.appendChild(notesFooter());
+// carry on with the patch from the last visit, if any (before the first render, so nothing flickers)
+const saved = recall();
+if (saved) {
+  doc = saved.document;
+  view = Editor.view(doc.patch);
+  showLoaded(saved.fromFile);
+}
 render();
 
 byId('file').addEventListener('change', openChosenFile);

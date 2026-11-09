@@ -1,0 +1,3 @@
+# The original site's pages, for hosts that read a _redirects file (Cloudflare, Netlify)
+/patch.asp      /  301
+/get_sysex.asp  /  301

@@ -6,8 +6,10 @@
   "themeColor": "#000000",
   "product": "Mutant Brain",
   "firmwareUrl": "https://www.ericasynths.lv/hexinverter-mutant-brain-2515/",
-  "url": "https://mutantbrainsurgery.web.app",
+  "url": "https://mutantbrainsurgery.hexinverter.net",
   "socialImageAlt": "Mutant Brain Surgery: SysEx Patch Builder for the Mutant Brain Eurorack Module, beside the black Mutant Brain module",
   "author": "Hexinverter Électronique",
-  "authorUrl": "https://www.hexinverter.net/"
+  "authorUrl": "https://www.hexinverter.net/",
+  "supportUrl": "https://github.com/stacygaudreau/mutantbrainsurgery-webapp/issues",
+  "supportLabel": "Let us know"
 }

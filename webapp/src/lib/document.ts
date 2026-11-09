@@ -12,6 +12,8 @@
  */
 import { Editor } from './editor/editor';
 import type { FieldRef, FieldValue, PatchState, ValueOf } from './editor/types';
+import { MutantBrainError } from './errors';
+import { defaultPatchData, type PatchData } from './model';
 import type { ByteInput } from './sysex';
 
 export interface PatchDocument {
@@ -65,6 +67,33 @@ function fileStem(name: string): string {
     .slice(0, MAX_NAME_LENGTH)
     .trim();
   return stem || DEFAULT_PATCH_NAME;
+}
+
+/** Format of PatchDocument.serialize's text. */
+const DOCUMENT_FORMAT = 'mutantbrain-patch-document';
+const DOCUMENT_VERSION = 1;
+
+const badDocument = (why: string): MutantBrainError => new MutantBrainError('BAD_DOCUMENT', `Not a saved patch document: ${why}`);
+
+/**
+ * Check that `value` has exactly the shape of `template` (a default patch):
+ * the same keys and array lengths, and whole numbers 0-127 (SysEx data bytes)
+ * where the template has numbers.
+ */
+function checkShape(value: unknown, template: unknown, at: string): void {
+  if (typeof template === 'number') {
+    if (typeof value !== 'number' || !Number.isInteger(value) || value < 0 || value > 127) throw badDocument(`${at} must be a whole number 0-127`);
+    return;
+  }
+  if (Array.isArray(template)) {
+    if (!Array.isArray(value) || value.length !== template.length) throw badDocument(`${at} must be a list of ${template.length}`);
+    value.forEach((item, i) => checkShape(item, template[i], `${at}[${i}]`));
+    return;
+  }
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) throw badDocument(`${at} must be an object`);
+  const keys = Object.keys(template as object).sort();
+  if (Object.keys(value).sort().join() !== keys.join()) throw badDocument(`${at} must have exactly ${keys.join(', ')}`);
+  for (const key of keys) checkShape((value as Record<string, unknown>)[key], (template as Record<string, unknown>)[key], `${at}.${key}`);
 }
 
 /** Patch name for a file: its base name without any folder or ".syx" extension. */
@@ -133,4 +162,28 @@ export const PatchDocument = Object.freeze({
 
   /** Patch name for a file name: without any folder or ".syx" extension. */
   nameFromFileName,
+
+  /**
+   * The document as text (JSON), to keep it somewhere and restore it later with
+   * `deserialize`, e.g. in browser storage. Unlike a .syx file it keeps every
+   * setting, including values of settings that are switched off, the name and
+   * the modified flag.
+   */
+  serialize(doc: PatchDocument): string {
+    return JSON.stringify({ format: DOCUMENT_FORMAT, version: DOCUMENT_VERSION, name: doc.name, modified: doc.modified, patch: doc.patch });
+  },
+
+  /** A document from `serialize`'s text. Throws MutantBrainError (BAD_DOCUMENT) for anything else. */
+  deserialize(text: string): PatchDocument {
+    let data: unknown;
+    try { data = JSON.parse(text); } catch { throw badDocument('not JSON'); }
+    if (typeof data !== 'object' || data === null) throw badDocument('not an object');
+    const { format, version, name, modified, patch } = data as Record<string, unknown>;
+    if (format !== DOCUMENT_FORMAT) throw badDocument(`format is not "${DOCUMENT_FORMAT}"`);
+    if (version !== DOCUMENT_VERSION) throw badDocument(`version ${String(version)} is not ${DOCUMENT_VERSION}`);
+    if (typeof name !== 'string') throw badDocument('name must be text');
+    if (typeof modified !== 'boolean') throw badDocument('modified must be true or false');
+    checkShape(patch, defaultPatchData(), 'patch');
+    return make(name, Editor.fromPatch(patch as PatchData), modified);
+  },
 });

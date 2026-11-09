@@ -26,7 +26,8 @@
   --body-font: 400 1.5rem/1.5 var(--mono);
   --focus-ring: 2px;
   --loaded: var(--act);
-  --field-hover: rgba(241, 242, 236, 0.04);
+  --field-fill: rgba(0, 0, 0, 0.3);
+  --field-hover: rgba(0, 0, 0, 0.42);
   --field-border-width: 1px;
   --pane-border-width: 1px;
   --pane-border: var(--dark);
@@ -35,7 +36,12 @@
   --btn-icon-gap: 1.2rem;
   --notes-text: var(--light);
   --notes-font-size: 1.5rem;
-  --notes-border: #2a2d2f;   /* a step darker than the other panes' --dark */
+  --notice-color: var(--pwr);      /* hero notice outline: the PWR LED red */
+  --notice-bg: rgba(17, 18, 19, 0.55);
+  --notice-overlap: 4rem;          /* narrow screens: over the bottom of the unit */
+  --bullet-size: 0.5em;      /* notes footer: a square ST-green "pixel" */
+  --bullet-radius: 0;
+  --bullet-color: var(--st);
 }
 
 ::selection { background: var(--st); color: var(--page); }
@@ -102,8 +108,6 @@
 /* ---------------------------------------------------------------- status messages */
 .status {
   border-left: 4px solid var(--mid);
-  font-size: 1.4rem;
-  line-height: 1.4;
 }
 .status::before {
   position: absolute; left: 1.4rem; top: 1.2rem;
@@ -119,6 +123,10 @@
    adds to the hero's 2rem padding. */
 @media (min-width: 900px) {
   .hero__inner { padding-top: 12rem; }
+}
+/* wide screens: the notice floats top left, beside the title (the unit spans the middle) */
+@media (min-width: 1100px) {
+  .notice.info-panel { position: absolute; left: 3rem; top: 4rem; width: 32rem; margin: 0; }
   .module-shot { margin: 12rem 0 10rem; }
 }
 .logo {
@@ -141,7 +149,7 @@
   text-transform: uppercase;
   color: var(--white);
 }
-.loader p { font-size: 1.5rem; line-height: 1.6; text-align: left; }
+.loader p { text-align: left; }
 .loader p strong { color: var(--white); }
 
 .field__label { font: 500 1.2rem/1.2 var(--mono); color: var(--mid); text-transform: uppercase; letter-spacing: 0.14em; }
@@ -178,7 +186,6 @@
 /* ---------------------------------------------------------------- settings sections */
 .pane-row { margin: 5rem 0; }
 
-.block .hint { font-size: 1.3rem; }
 
 table.grid { border-spacing: 0 2px; }
 table.grid td { padding: 0.3rem 0.25rem; }
@@ -202,7 +209,6 @@ select {
 select:focus { border-color: var(--st); }
 select:disabled { background: transparent; color: #4d5256; cursor: not-allowed; }
 
-.note { font-size: 1.3rem; }
 
 /* ---------------------------------------------------------------- download bar */
 .actions {

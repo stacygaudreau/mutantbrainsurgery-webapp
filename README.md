@@ -1,5 +1,9 @@
 # Mutant Brain Surgery
 
+[![Mutant Brain Surgery: SysEx Patch Builder for the Mutant Brain Eurorack Module](docs/hero.webp)](https://mutantbrainsurgery.hexinverter.net)
+
+**Live: [mutantbrainsurgery.hexinverter.net](https://mutantbrainsurgery.hexinverter.net)**
+
 A SysEx patch builder for the Hexinverter **Mutant Brain** Eurorack module, as a
 static web page that also comes branded for the **CV.OCD** MIDI to CV interface.
 Its SysEx library (`mutantbrain-surgery`, TypeScript, no dependencies) writes

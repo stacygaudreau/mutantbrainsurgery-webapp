@@ -83,7 +83,9 @@ test('CV.OCD site (dist/cvocd/): its own page and assets, the same app, no Hexin
     assert.ok(!fs.existsSync(path.join(root, 'dist/cvocd', f)), `no dist/cvocd/${f}`);
   }
   for (const file of ['dist/cvocd/index.html', 'dist/cvocd/style.css']) {
-    assert.doesNotMatch(read(file), /hexinverter|mutant ?brain|noyh/i, file);
+    // the bug report link goes to this project's GitHub issues (the repo is called mutantbrainsurgery-webapp)
+    const text = read(file).split('https://github.com/stacygaudreau/mutantbrainsurgery-webapp/issues').join('');
+    assert.doesNotMatch(text, /hexinverter|mutant ?brain|noyh/i, file);
   }
 });
 

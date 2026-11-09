@@ -181,25 +181,37 @@ test('renders every field with exactly the library schema', async (t) => {
   const headers = await page.evaluate(() => [...document.querySelectorAll('table.grid td[title]')].map((td) => td.textContent));
   assert.equal(headers.length, Form.SECTIONS.reduce((n, s) => n + s.columns.length, 0));
   assert.equal(await page.evaluate(() => document.querySelector('img.logo').naturalWidth > 0), true, 'logo loads');
-  const links = await page.evaluate(() => [...document.querySelectorAll('.note a')].map((a) => a.href));
+  const links = await page.evaluate(() => [...document.querySelectorAll('.notes .firmware a')].map((a) => a.href));
   assert.deepEqual(links, [Form.FIRMWARE_URL], 'one firmware note');
-  // the hover tip and the firmware note: untitled panes side by side after the settings,
-  // equal height, the pair centred in the page column; the settings panes have no notes
-  const layout = await page.evaluate(() => {
-    const row = document.querySelector('#sections > .notes');
+  // the notes: a footer after the settings (before the download bar), a bulleted list in
+  // the order bug report, tip, firmware note; left-aligned in a centred column narrower
+  // than the page, with drawn bullets instead of the browser's
+  const footer = await page.evaluate(() => {
+    const notes = document.querySelector('#sections > footer.notes');
     const box = (e) => e.getBoundingClientRect();
     const column = box(document.querySelector('#sections'));
-    const panes = [...row.children].map((s) => ({ label: s.getAttribute('aria-label'), titled: !!s.querySelector('.info-panel__header'), box: box(s) }));
+    const f = box(notes);
+    const items = [...notes.querySelectorAll('.notes__list > li')];
+    const before = getComputedStyle(items[0], '::before');
     return {
-      last: row === document.querySelector('#sections').lastElementChild,
-      panes: panes.map((p) => [p.label, p.titled]),
-      sameTop: Math.abs(panes[0].box.top - panes[1].box.top) < 1,
-      sameHeight: Math.abs(panes[0].box.height - panes[1].box.height) < 1,
-      centred: Math.abs((panes[0].box.left - column.left) - (column.right - panes[1].box.right)) < 1.5,
-      notesInSettings: document.querySelectorAll('#sections > section .note, #sections > section .hint, .pane-row:not(.notes) .hint').length,
+      last: notes === document.querySelector('#sections').lastElementChild,
+      order: items.map((li) => li.className),
+      inPanes: !!notes.closest('.info-panel'),
+      narrower: f.width < column.width - 200,
+      centred: Math.abs((f.left - column.left) - (column.right - f.right)) < 1.5,
+      leftAligned: items.every((li) => getComputedStyle(li).textAlign === 'left'),
+      stockBullets: getComputedStyle(notes.querySelector('ul')).listStyleType,
+      bullet: before.content !== 'none' && parseFloat(before.width) >= 6 && before.width === before.height,
+      notesInSettings: document.querySelectorAll('#sections > section .notes, #sections > section .tip, #sections > section .firmware').length,
     };
   });
-  assert.deepEqual(layout, { last: true, panes: [['Tip', false], ['Firmware note', false]], sameTop: true, sameHeight: true, centred: true, notesInSettings: 0 });
+  assert.deepEqual(footer, {
+    last: true, order: ['support', 'tip', 'firmware'], inPanes: false, narrower: true, centred: true,
+    leftAligned: true, stockBullets: 'none', bullet: true, notesInSettings: 0,
+  });
+  // the bug report link: the project's GitHub issues (on every brand)
+  const support = await page.evaluate(() => { const a = document.querySelector('.notes .support a'); return [a.closest('li').textContent, a.href, a.target]; });
+  assert.deepEqual(support, ['Found a bug? Let us know', 'https://github.com/stacygaudreau/mutantbrainsurgery-webapp/issues', '_blank']);
   assert.equal(await page.evaluate(() => getComputedStyle(document.querySelector('button.go')).position), 'static');
   assert.equal(await page.evaluate(() => getComputedStyle(document.querySelector('.actions')).position), 'sticky', 'download bar stays in reach');
   // the patch panel
@@ -227,7 +239,7 @@ test('renders every field with exactly the library schema', async (t) => {
   await waitOpened(page, referencePatches()[0].name);
   assert.deepEqual(await paneState(page), { title: 'Patch Loaded', loaded: true });
   const after = [await border('#patch-pane'), await border('.field__input')];
-  assert.equal(after[0], 'rgb(70, 173, 185)', 'teal pane border');
+  assert.equal(after[0], 'rgb(2, 202, 202)', 'teal pane border');
   assert.equal(after[1], after[0], 'name box border matches the pane');
   assert.notDeepEqual(after, before);
 });
@@ -467,11 +479,12 @@ test('the name reads as text until edited: click or pencil to edit, Enter to fin
   const boxFill = () => page.evaluate(() => getComputedStyle(document.querySelector('.field__input')).backgroundColor);
   await page.mouse.move(0, 0);
   assert.equal(await editing(), false);
-  assert.equal(await boxFill(), 'rgba(0, 0, 0, 0)', 'no fill while showing the name');
+  const restFill = await boxFill();
+  assert.notEqual(restFill, 'rgba(0, 0, 0, 0)', 'a darker fill at rest, so the box reads as editable');
   // pencil: edit with the whole name selected, so typing replaces it
   await page.click('#rename');
   assert.equal(await editing(), true);
-  assert.notEqual(await boxFill(), 'rgba(0, 0, 0, 0)', 'editor fill while editing');
+  assert.notEqual(await boxFill(), restFill, 'the editor fill while editing');
   assert.deepEqual(await page.evaluate(() => { const i = document.getElementById('patch-name'); return [i.selectionStart, i.selectionEnd]; }), [0, 'New Patch'.length]);
   await page.keyboard.type('Bassline');
   await page.keyboard.press('Enter');
@@ -514,8 +527,10 @@ test('CV.OCD site: its own branding, and the same patch editing', async (t) => {
   assert.equal(await page.getAttribute('img.topbar__logo', 'alt'), 'Sixty Four Pixels');
   assert.doesNotMatch(await page.evaluate(() => document.body.innerText), /hexinverter|mutant brain/i);
   // the firmware note links to the CV.OCD firmware
-  const links = await page.evaluate(() => [...document.querySelectorAll('.note a')].map((a) => a.href));
+  const links = await page.evaluate(() => [...document.querySelectorAll('.notes .firmware a')].map((a) => a.href));
   assert.deepEqual(links, ['https://github.com/hotchk155/cvocd.a']);
+  const support = await page.evaluate(() => { const a = document.querySelector('.notes .support a'); return [a.closest('li').textContent, a.href]; });
+  assert.deepEqual(support, ['Found a bug? Open an issue on GitHub', 'https://github.com/stacygaudreau/mutantbrainsurgery-webapp/issues']);
   // every field is there, and opening / editing / downloading works as on the other site
   assert.equal(await page.locator('#sysex select').count(), Form.FIELDS.length);
   const ref = referencePatches()[0];
@@ -548,7 +563,153 @@ test('both brands: keyboard focus on a dropdown shows the focus ring', async (t)
   }
 });
 
-test('both brands: on a touch phone the hover tip pane is hidden; with a mouse it shows', async (t) => {
+test('both brands: the "new web app" notice shows in the hero until its expiry date, then never', async (t) => {
+  if (skip()) return t.skip(skip());
+  const issues = 'https://github.com/stacygaudreau/mutantbrainsurgery-webapp/issues';
+  for (const [brand, url, product] of [['mutantbrain', baseUrl, 'Mutant Brain'], ['cvocd', cvocdUrl, 'CV.OCD']]) {
+    // before the expiry date (the test clock is fixed so this keeps passing after it)
+    for (const [width, when, shown] of [[1280, '2026-11-08T12:00:00', true], [390, '2027-08-07T23:00:00', true], [1280, '2027-08-08T00:00:01', false], [1280, '2030-01-01T00:00:00', false]]) {
+      const context = await browser.newContext({ viewport: { width, height: 900 } });
+      t.after(() => context.close());
+      await context.route((u) => !u.href.startsWith(url), (route) => route.fulfill({ status: 200, contentType: 'text/css', body: '' }));
+      const page = await context.newPage();
+      await page.clock.setFixedTime(new Date(when));
+      await page.goto(url);
+      await page.waitForFunction(() => window.MutantBrainApp);
+      const n = await page.evaluate(() => {
+        const notice = document.querySelector('.hero .notice');
+        const box = notice.getBoundingClientRect();
+        const hero = document.querySelector('.hero').getBoundingClientRect();
+        return {
+          hidden: notice.hidden,
+          visible: box.height > 0,
+          title: notice.querySelector('.info-panel__header').textContent,
+          text: notice.querySelector('p').textContent,
+          link: notice.querySelector('a').href,
+          inHero: box.top >= hero.top && box.bottom <= hero.bottom,
+          sideways: document.documentElement.scrollWidth > window.innerWidth,
+        };
+      });
+      const label = `${brand} at ${width}px on ${when}`;
+      assert.equal(n.visible, shown, `${label}: ${shown ? 'shown' : 'hidden'}`);
+      assert.equal(n.hidden, !shown, `${label}: hidden attribute`);
+      assert.equal(n.title, 'New Web App!', label);
+      assert.equal(n.text, `Welcome to the new ${product} configuration page! Please report any bugs or issues you encounter, on the Issue tracking dashboard here.`, label);
+      assert.equal(n.link, issues, label);
+      if (shown) assert.ok(n.inHero, `${label}: inside the hero`);
+      assert.equal(n.sideways, false, `${label}: no sideways scroll`);
+    }
+  }
+});
+
+test('the notice: its close button dismisses it for good (in this browser); on Mutant Brain phones it sits centred on the module', async (t) => {
+  if (skip()) return t.skip(skip());
+  for (const [brand, url] of [['mutantbrain', baseUrl], ['cvocd', cvocdUrl]]) {
+    const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+    t.after(() => context.close());
+    await context.route((u) => !u.href.startsWith(url), (route) => route.fulfill({ status: 200, contentType: 'text/css', body: '' }));
+    const page = await context.newPage();
+    await page.clock.setFixedTime(new Date('2026-11-08T12:00:00'));
+    await page.goto(url);
+    await page.waitForFunction(() => window.MutantBrainApp);
+    const visible = () => page.evaluate(() => document.querySelector('.hero .notice').getBoundingClientRect().height > 0);
+    assert.equal(await visible(), true, `${brand}: shown`);
+    assert.equal(await page.getAttribute('.notice__close', 'aria-label'), 'Dismiss this notice');
+    await page.click('.notice__close');
+    assert.equal(await visible(), false, `${brand}: closed`);
+    await page.reload();
+    await page.waitForFunction(() => window.MutantBrainApp);
+    assert.equal(await visible(), false, `${brand}: stays closed after a reload`);
+    // a fresh browser (no stored dismissal) shows it again
+    const other = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+    t.after(() => other.close());
+    await other.route((u) => !u.href.startsWith(url), (route) => route.fulfill({ status: 200, contentType: 'text/css', body: '' }));
+    const fresh = await other.newPage();
+    await fresh.clock.setFixedTime(new Date('2026-11-08T12:00:00'));
+    await fresh.goto(url);
+    await fresh.waitForFunction(() => window.MutantBrainApp);
+    assert.equal(await fresh.evaluate(() => document.querySelector('.hero .notice').getBoundingClientRect().height > 0), true, `${brand}: shown in another browser`);
+  }
+  // Mutant Brain below 1100px: centred over the module image, both ways
+  for (const width of [390, 1000]) {
+    const context = await browser.newContext({ viewport: { width, height: 900 } });
+    t.after(() => context.close());
+    await context.route((u) => !u.href.startsWith(baseUrl), (route) => route.fulfill({ status: 200, contentType: 'text/css', body: '' }));
+    const page = await context.newPage();
+    await page.clock.setFixedTime(new Date('2026-11-08T12:00:00'));
+    await page.goto(baseUrl);
+    await page.waitForFunction(() => window.MutantBrainApp);
+    await page.evaluate(() => document.fonts.ready);
+    const d = await page.evaluate(() => {
+      const c = (e) => { const b = e.getBoundingClientRect(); return [b.left + b.width / 2, b.top + b.height / 2]; };
+      const [nx, ny] = c(document.querySelector('.hero .notice'));
+      const [ix, iy] = c(document.querySelector('.module-shot'));
+      return [Math.abs(nx - ix), Math.abs(ny - iy)];
+    });
+    assert.ok(d[0] < 1 && d[1] < 1, `mutantbrain at ${width}px: notice centred on the module (off by ${d})`);
+  }
+});
+
+test('both brands: the open patch is kept across reloads and new tabs in the same browser', async (t) => {
+  if (skip()) return t.skip(skip());
+  const ref = referencePatches()[1];
+  for (const [brand, url] of [['mutantbrain', baseUrl], ['cvocd', cvocdUrl]]) {
+    const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+    t.after(() => context.close());
+    await context.route((u) => !u.href.startsWith(url), (route) => route.fulfill({ status: 200, contentType: 'text/css', body: '' }));
+    const ready = (p) => p.waitForFunction(() => window.MutantBrainApp);
+    const state = (p) => p.evaluate(() => ({
+      doc: window.MutantBrainApp.document(),
+      title: document.getElementById('patch-title').textContent,
+      name: document.getElementById('patch-name').value,
+      chan: document.querySelector('select[name="global.chan"]').value,
+    }));
+    const page = await context.newPage();
+    await page.goto(url);
+    await ready(page);
+    // open a file, edit it, rename it
+    await page.setInputFiles('#file', { name: ref.name, mimeType: 'application/octet-stream', buffer: ref.bytes });
+    await page.waitForFunction(() => document.getElementById('patch-pane').classList.contains('loader--loaded'));
+    await page.selectOption('select[name="global.chan"]', '9');
+    await page.fill('#patch-name', 'Kept Patch');
+    const before = await state(page);
+    assert.equal(before.doc.modified, true);
+    // a reload, and a new tab (as after closing the browser and coming back)
+    await page.reload();
+    await ready(page);
+    assert.deepEqual(await state(page), before, `${brand}: same patch after a reload`);
+    const tab = await context.newPage();
+    await tab.goto(url);
+    await ready(tab);
+    assert.deepEqual(await state(tab), before, `${brand}: same patch in a new tab`);
+    assert.equal((await state(tab)).title, 'Patch Loaded');
+    // New Patch is kept too
+    await tab.click('#new');
+    await tab.reload();
+    await ready(tab);
+    const fresh = await state(tab);
+    assert.deepEqual([fresh.name, fresh.title, fresh.doc.modified], ['New Patch', 'Load Patch', false], `${brand}: new patch kept`);
+    // another browser (profile) starts with a new patch
+    const other = await browser.newContext();
+    t.after(() => other.close());
+    await other.route((u) => !u.href.startsWith(url), (route) => route.fulfill({ status: 200, contentType: 'text/css', body: '' }));
+    const elsewhere = await other.newPage();
+    await elsewhere.goto(url);
+    await ready(elsewhere);
+    assert.equal((await state(elsewhere)).name, 'New Patch', `${brand}: other browsers are unaffected`);
+    // damaged storage: starts with a new patch, no errors, and the bad entry is dropped
+    const errors = [];
+    elsewhere.on('pageerror', (e) => errors.push(e.message));
+    await elsewhere.evaluate(() => localStorage.setItem('mutantbrain-surgery:open-patch', '{"document":"garbage"}'));
+    await elsewhere.reload();
+    await ready(elsewhere);
+    assert.equal((await state(elsewhere)).name, 'New Patch', `${brand}: damaged storage ignored`);
+    assert.equal(await elsewhere.evaluate(() => localStorage.getItem('mutantbrain-surgery:open-patch')), null);
+    assert.deepEqual(errors, []);
+  }
+});
+
+test('both brands: on a touch phone the hover tip is hidden; with a mouse it shows', async (t) => {
   if (skip()) return t.skip(skip());
   const { devices } = require('playwright-core');
   for (const [brand, url] of [['mutantbrain', baseUrl], ['cvocd', cvocdUrl]]) {
@@ -561,12 +722,14 @@ test('both brands: on a touch phone the hover tip pane is hidden; with a mouse i
       await page.waitForFunction(() => document.querySelector('.notes'));
       const r = await page.evaluate(() => ({
         touch: matchMedia('(hover: none)').matches,
-        tip: document.querySelector('.info-panel.tip').getBoundingClientRect().height > 0,
-        firmware: document.querySelector('.info-panel.firmware').getBoundingClientRect().height > 0,
+        tip: document.querySelector('.notes .tip').getBoundingClientRect().height > 0,
+        firmware: document.querySelector('.notes .firmware').getBoundingClientRect().height > 0,
+        support: document.querySelector('.notes .support').getBoundingClientRect().height > 0,
       }));
       assert.equal(r.touch, !shown, `${brand} ${name}: emulated as ${shown ? 'mouse' : 'touch'}`);
-      assert.equal(r.tip, shown, `${brand} ${name}: tip pane ${shown ? 'shown' : 'hidden'}`);
+      assert.equal(r.tip, shown, `${brand} ${name}: tip ${shown ? 'shown' : 'hidden'}`);
       assert.equal(r.firmware, true, `${brand} ${name}: firmware note always shown`);
+      assert.equal(r.support, true, `${brand} ${name}: bug report always shown`);
     }
   }
 });

@@ -14,7 +14,9 @@ export type MutantBrainErrorCode =
   /** A form field name or value that the form does not have. */
   | 'BAD_FORM_VALUE'
   /** An Editor field reference to a section, item index or control that does not exist. */
-  | 'BAD_FIELD_REF';
+  | 'BAD_FIELD_REF'
+  /** Text that is not a saved PatchDocument (see PatchDocument.serialize). */
+  | 'BAD_DOCUMENT';
 
 /** The only error type this library throws. Check `code` to tell cases apart. */
 export class MutantBrainError extends Error {
